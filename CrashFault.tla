@@ -5,7 +5,7 @@
 (* algorithm.                                                              *)
 (***************************************************************************)
 
-EXTENDS Naturals, TLC
+EXTENDS Integers, TLC
 
 CONSTANTS
         P \* processors
@@ -54,68 +54,113 @@ Distance(W, v, G) == \* W is a set of vertices
 (***************************************************************************)
 (* Now we're ready for the algorithm.                                      *)
 (*                                                                         *)
-(* The main invariant is that a node has at most on notarized child.  By   *)
+(* The main invariant is that a node has at most one notarized child.  By  *)
 (* induction from the root, this means there's a single notarized chain.   *)
+(*                                                                         *)
+(* TODO: the marking thing does not work...  needs a double-mark of sort.  *)
 (***************************************************************************)
 
 ChainRoot == CHOOSE v \in V : TRUE \* we pick an arbitrary root
+
+Abs(n) == IF n < 0 THEN -n ELSE n
 
 (* 
 --algorithm Consensus {
     variables
         chains = <<{ChainRoot}, {}>>, \* invariant: will remain a tree
-        longest = [p \in P |-> ChainRoot], \* longest notarized chain known to p
-        votes = [p \in P |-> {}] \* processes vote for chains vertices
+        notarizedHeight = [p \in P |-> 0], \* longest notarized chain seen by p
+        votedHeight = [p \in P |-> 0],
+        votes = [p \in P |-> {}], \* processes vote for chains vertices
+        marked = [p \in P |-> {}], \* a process marks a node if it's one ahead of the max height it ever voted for
     define {
-        Notarized(v) == \E Q \in Quorum : \A p \in Q : v \in votes[p]   
+        Notarized(v) == v = ChainRoot \/ \E Q \in Quorum : \A p \in Q : v \in votes[p]  
         Height(v) == Distance({ChainRoot}, v, chains)
-        Decided(v) == v \in Vertices(chains) /\ \E w \in Children({v}, chains) : Notarized(w)
-        Inv1 == \A v \in Vertices(chains) : \A w1,w2 \in Children({v}, chains) : Notarized(w1) /\ Notarized(w2) => w1 = w2
+        \* The tip of a notarized chain:
+        Tip(v) == v \in Vertices(chains) /\ Notarized(v) /\ \A w \in Vertices(chains) : Notarized(w) /\ v # w => \neg Reachable(v, w, chains)
+        \* A tip is still competing if a quorum has a lower or equal notarized height:
+        Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : notarizedHeight[p] <= Height(v)
+        \* The heights of two competing tips differ at most by 1:   
+        Inv1 == \A v,w \in Vertices(chains) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
+        (*******************************************************************)
+        (* By Inv1, we know that if a tip is more than on behind, it can   *)
+        (* never be built on anymore.  So we can decide when we detect     *)
+        (* that all competing tips must be more than one behind.  This is  *)
+        (* when two vertices are notarized in a row.                       *)
+        (*******************************************************************)
+        \* A notarized vertice is marked when a quorum put a mark on it. When a notarized vertice is marked and its child is notarized and marked, the first can be decided.
+        NotarizedMarked(v) == v = ChainRoot \/ \E Q \in Quorum : \A p \in Q : v \in marked[p]
+        \* Decided vertices:
+        Decided(v) == NotarizedMarked(v) /\ \E w \in Children({v}, chains) : NotarizedMarked(w)
+        \* Main safety property:
         Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Reachable(v, w, chains) \/ Reachable(w, v, chains)
     }
     process (proc \in P) {
 l1:     \* extend a longer notarized chain with a vote
         while (TRUE)
             with (v \in Vertices(chains)) {
-                when (Notarized(v) \/ v = ChainRoot) /\ Height(v) >= Height(longest[self]);
-                longest[self] := v;
-                when \A w \in V : \neg (w \in Children({v}, chains) /\ w \in votes[self]); \* not extended v yet
-                with (w \in (V \ Vertices(chains)) \cup Children({v}, chains)) { \* pick a fresh vertice or vote for an exiting child
+                when Notarized(v) /\ Height(v) >= notarizedHeight[self];
+                notarizedHeight[self] := Height(v);
+                with (w \in (V \ Vertices(chains)) \cup Children({v}, chains)) { \* pick a fresh vertice or vote for an existing child
                     chains := AddEdge(v, w, chains);
                     votes[self] := votes[self] \cup {w};
-                }
+                    if (votedHeight[self] < notarizedHeight[self]+1) {
+                        marked[self] := marked[self] \cup {w};
+                    }; 
+                    votedHeight[self] := notarizedHeight[self]+1;
+                };
             }
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "b2e7420a" /\ chksum(tla) = "eadecc7e")
-VARIABLES chains, longest, votes
+\* BEGIN TRANSLATION (chksum(pcal) = "1f600c9b" /\ chksum(tla) = "2c000c13")
+VARIABLES chains, notarizedHeight, votedHeight, votes, marked
 
 (* define statement *)
-Notarized(v) == \E Q \in Quorum : \A p \in Q : v \in votes[p]
+Notarized(v) == v = ChainRoot \/ \E Q \in Quorum : \A p \in Q : v \in votes[p]
 Height(v) == Distance({ChainRoot}, v, chains)
-Decided(v) == v \in Vertices(chains) /\ \E w \in Children({v}, chains) : Notarized(w)
-Inv1 == \A v \in Vertices(chains) : \A w1,w2 \in Children({v}, chains) : Notarized(w1) /\ Notarized(w2) => w1 = w2
+
+Tip(v) == v \in Vertices(chains) /\ Notarized(v) /\ \A w \in Vertices(chains) : Notarized(w) /\ v # w => \neg Reachable(v, w, chains)
+
+Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : notarizedHeight[p] <= Height(v)
+
+Inv1 == \A v,w \in Vertices(chains) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
+
+
+
+
+
+
+
+NotarizedMarked(v) == v = ChainRoot \/ \E Q \in Quorum : \A p \in Q : v \in marked[p]
+
+Decided(v) == NotarizedMarked(v) /\ \E w \in Children({v}, chains) : NotarizedMarked(w)
+
 Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Reachable(v, w, chains) \/ Reachable(w, v, chains)
 
 
-vars == << chains, longest, votes >>
+vars == << chains, notarizedHeight, votedHeight, votes, marked >>
 
 ProcSet == (P)
 
 Init == (* Global variables *)
         /\ chains = <<{ChainRoot}, {}>>
-        /\ longest = [p \in P |-> ChainRoot]
+        /\ notarizedHeight = [p \in P |-> 0]
+        /\ votedHeight = [p \in P |-> 0]
         /\ votes = [p \in P |-> {}]
+        /\ marked = [p \in P |-> {}]
 
 proc(self) == \E v \in Vertices(chains):
-                /\ (Notarized(v) \/ v = ChainRoot) /\ Height(v) >= Height(longest[self])
-                /\ longest' = [longest EXCEPT ![self] = v]
-                /\ \A w \in V : \neg (w \in Children({v}, chains) /\ w \in votes[self])
+                /\ Notarized(v) /\ Height(v) >= notarizedHeight[self]
+                /\ notarizedHeight' = [notarizedHeight EXCEPT ![self] = Height(v)]
                 /\ \E w \in (V \ Vertices(chains)) \cup Children({v}, chains):
                      /\ chains' = AddEdge(v, w, chains)
                      /\ votes' = [votes EXCEPT ![self] = votes[self] \cup {w}]
+                     /\ IF votedHeight[self] < notarizedHeight'[self]+1
+                           THEN /\ marked' = [marked EXCEPT ![self] = marked[self] \cup {w}]
+                           ELSE /\ TRUE
+                                /\ UNCHANGED marked
+                     /\ votedHeight' = [votedHeight EXCEPT ![self] = notarizedHeight'[self]+1]
 
 Next == (\E self \in P: proc(self))
 
@@ -125,5 +170,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Fri Dec 17 11:01:40 PST 2021 by nano
+\* Last modified Fri Dec 17 17:57:23 PST 2021 by nano
 \* Created Fri Dec 17 07:53:09 PST 2021 by nano

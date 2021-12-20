@@ -1,4 +1,4 @@
------------------------------ MODULE CrashFault -----------------------------
+---------------------------- MODULE PreStreamlet ----------------------------
 
 (***************************************************************************)
 (* Here we specify a simpler version of the crash-fault Streamlet          *)
@@ -87,7 +87,7 @@ l1:     while (TRUE) \* extend a longer notarized chain with a vote
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "574e9dbd" /\ chksum(tla) = "86da9a04")
+\* BEGIN TRANSLATION (chksum(pcal) = "ac244b62" /\ chksum(tla) = "58492519")
 VARIABLES height, votes
 
 (* define statement *)
@@ -105,7 +105,7 @@ Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
 Safety == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
 Inv1 == IsDigraph(G)
 Temporal1 == \A v,w \in V\{Root} : v#w => [](
-    Tip(v) /\ Tip(w) /\ Height(v) <= Height(w)-1
+    Tip(v) /\ Tip(w) /\ Height(v) < Height(w)-1
         => []( \A u \in V\{Root,v} : \neg Reachable(v,u,G) /\ Notarized(u) ) )
 
 
@@ -131,5 +131,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Sun Dec 19 21:32:25 PST 2021 by nano
+\* Last modified Sun Dec 19 22:05:43 PST 2021 by nano
 \* Created Fri Dec 17 07:53:09 PST 2021 by nano

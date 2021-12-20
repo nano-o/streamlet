@@ -70,9 +70,8 @@ Abs(n) == IF n < 0 THEN -n ELSE n
         Safety == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
         Inv1 == IsDigraph(G)
         Temporal1 == \A v,w \in V\{Root} : v#w => []( 
-            Tip(v) /\ Tip(w) /\ Height(v) <= Height(w)-1  
-                => []( \A u \in V\{Root,v} : \neg (Reachable(v,u,G)) ) )
-                \* => []( \A u \in V\{Root,v} : \neg (Tip(u) /\ Reachable(v,u,G)) ) )
+            Tip(v) /\ Tip(w) /\ Height(v) < Height(w)-1    
+                => []( \A u \in V\{Root,v} : \neg Reachable(v,u,G) /\ Notarized(u) ) )
     }
     process (proc \in P) {
 l1:     while (TRUE) \* extend a longer notarized chain with a vote
@@ -88,7 +87,7 @@ l1:     while (TRUE) \* extend a longer notarized chain with a vote
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "448f9375" /\ chksum(tla) = "7b4ddf8b")
+\* BEGIN TRANSLATION (chksum(pcal) = "574e9dbd" /\ chksum(tla) = "86da9a04")
 VARIABLES height, votes
 
 (* define statement *)
@@ -107,7 +106,7 @@ Safety == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v)
 Inv1 == IsDigraph(G)
 Temporal1 == \A v,w \in V\{Root} : v#w => [](
     Tip(v) /\ Tip(w) /\ Height(v) <= Height(w)-1
-        => []( \A u \in V\{Root,v} : \neg (Reachable(v,u,G)) ) )
+        => []( \A u \in V\{Root,v} : \neg Reachable(v,u,G) /\ Notarized(u) ) )
 
 
 vars == << height, votes >>
@@ -132,5 +131,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Sun Dec 19 21:06:49 PST 2021 by nano
+\* Last modified Sun Dec 19 21:32:25 PST 2021 by nano
 \* Created Fri Dec 17 07:53:09 PST 2021 by nano

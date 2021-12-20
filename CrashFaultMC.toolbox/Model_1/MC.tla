@@ -8,24 +8,24 @@ p1, p2, p3
 
 \* MV CONSTANT declarations@modelParameterConstants
 CONSTANTS
-v1, v2, v3, v4, v5, v6, v7, v8
+v1, v2, v3, v4, v5, v6
 ----
 
 \* MV CONSTANT definitions P
-const_1639768087211271000 == 
+const_16399732840901279000 == 
 {p1, p2, p3}
 ----
 
 \* MV CONSTANT definitions V
-const_1639768087211272000 == 
-{v1, v2, v3, v4, v5, v6, v7, v8}
+const_16399732840901280000 == 
+{v1, v2, v3, v4, v5, v6}
 ----
 
 \* SYMMETRY definition
-symm_1639768087211273000 == 
-Permutations(const_1639768087211271000)
+symm_16399732840901281000 == 
+Permutations(const_16399732840901279000) \union Permutations(const_16399732840901280000)
 ----
 
 =============================================================================
 \* Modification History
-\* Created Fri Dec 17 11:08:07 PST 2021 by nano
+\* Created Sun Dec 19 20:08:04 PST 2021 by nano

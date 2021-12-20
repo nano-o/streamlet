@@ -5,7 +5,7 @@
 (* algorithm.                                                              *)
 (***************************************************************************)
 
-EXTENDS Naturals, TLC
+EXTENDS Integers, TLC
 
 CONSTANTS
         P \* processors
@@ -13,35 +13,23 @@ CONSTANTS
     ,   Quorum \* Quorums
 
 (***************************************************************************)
-(* We need to reason about directed graphs, and trees in particular.  A    *)
-(* chains consists of edges and vertices.                                 *)
+(* First we need a few notions about directed graphs.  A directed graph is *)
+(* a set of edges.                                                         *)
 (***************************************************************************)
-Vertices(G) == G[1]
-Edges(G) == G[2]
-IsDigraph(G) ==
-    /\  G = <<Vertices(G), Edges(G)>>
-    /\  Edges(G) \subseteq (Vertices(G) \times Vertices(G))
-    
-Children(W, G) == UNION {{w \in Vertices(G) : <<v,w>> \in Edges(G)} : v \in W} 
 
-AddEdge(v, w, G) ==
-    LET Vs == Vertices(G) \cup {w}
-        Es == Edges(G) \cup {<<v,w>>} 
-    IN <<Vs, Es>>
+Vertices(G) == {v \in V : \E w \in V : <<v,w>> \in G \/ <<w,v>> \in G}
+
+IsDigraph(G) == \A e \in G : e[1] \in Vertices(G) /\ e[2] \in Vertices(G) 
+    
+Children(W, G) == UNION {{w \in Vertices(G) : <<v,w>> \in G} : v \in W} 
             
 RECURSIVE Reachable(_,_,_)
 Reachable(v1, v2, G) ==
-    /\  v1 \in Vertices(G) /\ v2 \in Vertices(G)
-    /\  \/  v1 = v2
-        \/  <<v1,v2>> \in Edges(G)
-        \/  \E v3 \in Children({v1}, G) : Reachable(v3, v2, G)
-        
-RECURSIVE ReachableSet(_,_)
- ReachableSet(W,G) == \* W is a set of vertices
-    LET C == Children(W, G) IN 
-        IF C = {}
-        THEN W
-        ELSE W \cup {ReachableSet(C,G)}
+    \/  v1 = v2
+    \/  <<v1,v2>> \in G
+    \/  \E v3 \in Children({v1}, G) : Reachable(v3, v2, G)
+                
+Compatible(v, w, G) == Reachable(v, w, G) \/ Reachable(w, v, G)
 
 RECURSIVE Distance(_,_,_)
 Distance(W, v, G) == \* W is a set of vertices
@@ -54,68 +42,82 @@ Distance(W, v, G) == \* W is a set of vertices
 (***************************************************************************)
 (* Now we're ready for the algorithm.                                      *)
 (*                                                                         *)
-(* The main invariant is that a node has at most on notarized child.  By   *)
-(* induction from the root, this means there's a single notarized chain.   *)
+(* We want to show that the height of two competing tips differ at most by *)
+(* 1.                                                                      *)
 (***************************************************************************)
 
 ChainRoot == CHOOSE v \in V : TRUE \* we pick an arbitrary root
 
+Abs(n) == IF n < 0 THEN -n ELSE n
+
 (* 
 --algorithm Consensus {
     variables
-        chains = <<{ChainRoot}, {}>>, \* invariant: will remain a tree
-        longest = [p \in P |-> ChainRoot], \* longest notarized chain known to p
-        votes = [p \in P |-> {}] \* processes vote for chains vertices
+        height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
+        votes = [p \in P |-> {}], \* the votes cast by the processes
     define {
-        Notarized(v) == \E Q \in Quorum : \A p \in Q : v \in votes[p]   
-        Height(v) == Distance({ChainRoot}, v, chains)
-        Decided(v) == v \in Vertices(chains) /\ \E w \in Children({v}, chains) : Notarized(w)
-        Inv1 == \A v \in Vertices(chains) : \A w1,w2 \in Children({v}, chains) : Notarized(w1) /\ Notarized(w2) => w1 = w2
-        Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Reachable(v, w, chains) \/ Reachable(w, v, chains)
+        G == {<<ChainRoot,ChainRoot>>} \cup UNION {votes[p] : p \in P} 
+        Notarized(v) == v = ChainRoot \/ \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : <<w,v>> \in votes[p]  
+        Height(v) == Distance({ChainRoot}, v, G)
+        \* The tip of a notarized chain:
+        Tip(v) == 
+            /\  v \in Vertices(G) 
+            /\  Notarized(v) 
+            /\  \A w \in Vertices(G) : Notarized(w) /\ v # w => \neg Reachable(v, w, G)
+        \* A tip is still competing if a quorum has a lower or equal notarized height:
+        Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
+        \* The heights of two competing tips differ at most by 1:   
+        Safety == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
+        Inv1 == IsDigraph(G)
+        Temporal1 == []( \A v,w \in Vertices(G) : Height(v) < Height(w)-1 => []( \A u \in Vertices(G) : Reachable(v,u,G) => u = v ))
     }
     process (proc \in P) {
-l1:     \* extend a longer notarized chain with a vote
-        while (TRUE)
-            with (v \in Vertices(chains)) {
-                when (Notarized(v) \/ v = ChainRoot) /\ Height(v) >= Height(longest[self]);
-                longest[self] := v;
-                when \A w \in V : \neg (w \in Children({v}, chains) /\ w \in votes[self]); \* not extended v yet
-                with (w \in (V \ Vertices(chains)) \cup Children({v}, chains)) { \* pick a fresh vertice or vote for an exiting child
-                    chains := AddEdge(v, w, chains);
-                    votes[self] := votes[self] \cup {w};
-                }
+l1:     while (TRUE) \* extend a longer notarized chain with a vote
+            with (v \in Vertices(G)) { \* the notarized vertices we're going to extend
+                when Notarized(v) /\ Height(v) >= height[self];
+                height[self] := Height(v);
+                \* pick a fresh vertice or vote for an existing child of v:
+                with (w \in (V \ Vertices(G)) \cup Children({v}, G)) { 
+                    votes[self] := @ \cup {<<v,w>>};
+                };
             }
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "b2e7420a" /\ chksum(tla) = "eadecc7e")
-VARIABLES chains, longest, votes
+\* BEGIN TRANSLATION (chksum(pcal) = "dbb0a08b" /\ chksum(tla) = "3176b592")
+VARIABLES height, votes
 
 (* define statement *)
-Notarized(v) == \E Q \in Quorum : \A p \in Q : v \in votes[p]
-Height(v) == Distance({ChainRoot}, v, chains)
-Decided(v) == v \in Vertices(chains) /\ \E w \in Children({v}, chains) : Notarized(w)
-Inv1 == \A v \in Vertices(chains) : \A w1,w2 \in Children({v}, chains) : Notarized(w1) /\ Notarized(w2) => w1 = w2
-Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Reachable(v, w, chains) \/ Reachable(w, v, chains)
+G == {<<ChainRoot,ChainRoot>>} \cup UNION {votes[p] : p \in P}
+Notarized(v) == v = ChainRoot \/ \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : <<w,v>> \in votes[p]
+Height(v) == Distance({ChainRoot}, v, G)
+
+Tip(v) ==
+    /\  v \in Vertices(G)
+    /\  Notarized(v)
+    /\  \A w \in Vertices(G) : Notarized(w) /\ v # w => \neg Reachable(v, w, G)
+
+Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
+
+Safety == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
+Inv1 == IsDigraph(G)
+Temporal1 == []( \A v,w \in Vertices(G) : Height(v) < Height(w)-1 => []( \A u \in Vertices(G) : Reachable(v,u,G) => u = v ))
 
 
-vars == << chains, longest, votes >>
+vars == << height, votes >>
 
 ProcSet == (P)
 
 Init == (* Global variables *)
-        /\ chains = <<{ChainRoot}, {}>>
-        /\ longest = [p \in P |-> ChainRoot]
+        /\ height = [p \in P |-> 0]
         /\ votes = [p \in P |-> {}]
 
-proc(self) == \E v \in Vertices(chains):
-                /\ (Notarized(v) \/ v = ChainRoot) /\ Height(v) >= Height(longest[self])
-                /\ longest' = [longest EXCEPT ![self] = v]
-                /\ \A w \in V : \neg (w \in Children({v}, chains) /\ w \in votes[self])
-                /\ \E w \in (V \ Vertices(chains)) \cup Children({v}, chains):
-                     /\ chains' = AddEdge(v, w, chains)
-                     /\ votes' = [votes EXCEPT ![self] = votes[self] \cup {w}]
+proc(self) == \E v \in Vertices(G):
+                /\ Notarized(v) /\ Height(v) >= height[self]
+                /\ height' = [height EXCEPT ![self] = Height(v)]
+                /\ \E w \in (V \ Vertices(G)) \cup Children({v}, G):
+                     votes' = [votes EXCEPT ![self] = @ \cup {<<v,w>>}]
 
 Next == (\E self \in P: proc(self))
 
@@ -125,5 +127,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Fri Dec 17 11:01:40 PST 2021 by nano
+\* Last modified Sun Dec 19 20:07:15 PST 2021 by nano
 \* Created Fri Dec 17 07:53:09 PST 2021 by nano

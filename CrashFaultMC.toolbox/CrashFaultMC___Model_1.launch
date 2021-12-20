@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="org.lamport.tla.toolbox.tool.tlc.modelCheck">
     <stringAttribute key="TLCCmdLineParameters" value=""/>
-    <intAttribute key="collectCoverage" value="1"/>
+    <intAttribute key="collectCoverage" value="0"/>
     <stringAttribute key="configurationName" value="Model_1"/>
     <booleanAttribute key="deferLiveness" value="false"/>
     <intAttribute key="dfidDepth" value="100"/>
@@ -12,30 +12,32 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value=""/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="3"/>
+    <intAttribute key="fpIndex" value="127"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
     <intAttribute key="maxHeapSize" value="17"/>
-    <intAttribute key="maxSetSize" value="1000000"/>
+    <intAttribute key="maxSetSize" value="10000000"/>
     <booleanAttribute key="mcMode" value="true"/>
     <stringAttribute key="modelBehaviorInit" value=""/>
     <stringAttribute key="modelBehaviorNext" value=""/>
     <stringAttribute key="modelBehaviorSpec" value="Spec"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
-    <stringAttribute key="modelBehaviorVars" value="chains, longest, votes"/>
+    <stringAttribute key="modelBehaviorVars" value="height, votes"/>
     <stringAttribute key="modelComments" value=""/>
-    <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
+    <booleanAttribute key="modelCorrectnessCheckDeadlock" value="true"/>
     <listAttribute key="modelCorrectnessInvariants">
         <listEntry value="1Inv1"/>
         <listEntry value="0BaitInv1"/>
-        <listEntry value="0BaitInv2"/>
         <listEntry value="1Safety"/>
+        <listEntry value="0BaitInv2"/>
     </listAttribute>
-    <listAttribute key="modelCorrectnessProperties"/>
+    <listAttribute key="modelCorrectnessProperties">
+        <listEntry value="1Temporal1"/>
+    </listAttribute>
     <intAttribute key="modelEditorOpenTabs" value="12"/>
     <stringAttribute key="modelExpressionEval" value=""/>
     <listAttribute key="modelParameterConstants">
         <listEntry value="P;;{p1, p2, p3};1;1"/>
-        <listEntry value="V;;{v1, v2, v3, v4, v5, v6, v7, v8};1;0"/>
+        <listEntry value="V;;{v1, v2, v3, v4, v5, v6};1;1"/>
     </listAttribute>
     <intAttribute key="modelVersion" value="20191005"/>
     <intAttribute key="numberOfWorkers" value="3"/>
@@ -47,9 +49,9 @@
     <stringAttribute key="specName" value="CrashFaultMC"/>
     <stringAttribute key="tlcResourcesProfile" value="local custom"/>
     <listAttribute key="traceExploreExpressions">
-        <listEntry value="1Vertices(digraph)"/>
-        <listEntry value="1Edges(digraph)"/>
-        <listEntry value="1Reachable(v1, v2, digraph)"/>
+        <listEntry value="1[v \in Vertices(G) |-&gt; Height(v)]"/>
+        <listEntry value="1{v \in Vertices(G) : Notarized(v)}"/>
+        <listEntry value="1G"/>
     </listAttribute>
     <stringAttribute key="view" value=""/>
     <booleanAttribute key="visualizeStateGraph" value="false"/>

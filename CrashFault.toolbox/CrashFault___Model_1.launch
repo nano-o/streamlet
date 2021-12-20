@@ -12,7 +12,7 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value="-Xss100m"/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="61"/>
+    <intAttribute key="fpIndex" value="37"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
     <intAttribute key="maxHeapSize" value="25"/>
     <intAttribute key="maxSetSize" value="1000000"/>
@@ -48,6 +48,8 @@
     <listAttribute key="traceExploreExpressions">
         <listEntry value="1{v \in V : Tip(v)}"/>
         <listEntry value="0[v \in Vertices(G)\{Root} |-&gt; Height(v)]"/>
+        <listEntry value="1G"/>
+        <listEntry value="1{v \in V : Notarized(v)}"/>
     </listAttribute>
     <stringAttribute key="view" value=""/>
     <booleanAttribute key="visualizeStateGraph" value="false"/>

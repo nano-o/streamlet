@@ -60,3 +60,49 @@ In contrast, in the model of the present post, nodes independently learn about n
 Thus, I think that the model of this post more faithfully represents what can happen in an asynchronous system.
 
 Stay tuned for a discussion of Streamlet's liveness property.
+
+# TLC counter-example
+
+```
+Error: The following behavior constitutes a counter-example:
+
+State 1: <Initial predicate>
+/\ height = (p1 :> 0 @@ p2 :> 0 @@ p3 :> 0)
+/\ votes = (p1 :> {<<v1, v3>>, <<v1, v5>>} @@ p2 :> {<<v1, v3>>} @@ p3 :> {<<v1, v5>>})
+
+State 2: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 0 @@ p3 :> 0)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>} @@
+  p3 :> {<<v1, v5>>} )
+
+State 3: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 1 @@ p3 :> 0)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>, <<v3, v2>>} @@
+  p3 :> {<<v1, v5>>} )
+
+State 4: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 1 @@ p3 :> 0)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>} @@
+  p3 :> {<<v1, v5>>} )
+
+State 5: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 0)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
+  p3 :> {<<v1, v5>>} )
+
+State 6: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 2)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
+  p3 :> {<<v1, v5>>, <<v6, v4>>} )
+
+State 7: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
+/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 2)
+/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v3, v2>>, <<v5, v6>>} @@
+  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
+  p3 :> {<<v1, v5>>, <<v6, v4>>} )
+```

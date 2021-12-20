@@ -79,7 +79,7 @@ l1:     while (TRUE) \* extend a longer notarized chain with a vote
                 when Notarized(v) /\ Height(v) >= height[self];
                 height[self] := Height(v);
                 \* pick a fresh vertice or vote for an existing child of v:
-                with (w \in (V \ Vertices(G)) \cup Children({v}, G)) { 
+                with (w \in (V \ (Vertices(G) \cup {Root})) \cup Children({v}, G)) { 
                     votes[self] := @ \cup {<<v,w>>};
                 };
             }
@@ -87,7 +87,7 @@ l1:     while (TRUE) \* extend a longer notarized chain with a vote
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "c9f9bca7" /\ chksum(tla) = "7ea42348")
+\* BEGIN TRANSLATION (chksum(pcal) = "3b43f1b4" /\ chksum(tla) = "32d88fec")
 VARIABLES height, votes
 
 (* define statement *)
@@ -120,7 +120,7 @@ Init == (* Global variables *)
 proc(self) == \E v \in Vertices(G) \cup {Root}:
                 /\ Notarized(v) /\ Height(v) >= height[self]
                 /\ height' = [height EXCEPT ![self] = Height(v)]
-                /\ \E w \in (V \ Vertices(G)) \cup Children({v}, G):
+                /\ \E w \in (V \ (Vertices(G) \cup {Root})) \cup Children({v}, G):
                      votes' = [votes EXCEPT ![self] = @ \cup {<<v,w>>}]
 
 Next == (\E self \in P: proc(self))
@@ -131,5 +131,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 20 08:39:43 PST 2021 by nano
+\* Last modified Mon Dec 20 09:24:08 PST 2021 by nano
 \* Created Fri Dec 17 07:53:09 PST 2021 by nano

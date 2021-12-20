@@ -5,29 +5,63 @@
 (* algorithm.                                                              *)
 (***************************************************************************)
 
-EXTENDS Integers, DiGraph, TLC, FiniteSets
+EXTENDS Integers, TLC, FiniteSets
 
 CONSTANTS
         P \* The set of processors
     ,   V \* The set of values
     ,   Quorum \* The set of quorums
-    ,   Round \* The set of rounds. Should be of the form 0..N
+    ,   Round \* The set of rounds. Should be of the form 1..N
 
-ChainRoot == CHOOSE v \in V : TRUE \* An arbitrary vertice
+(***************************************************************************)
+(* First we need a few notions about directed graphs.  A directed graph is *)
+(* a set of edges.                                                         *)
+(***************************************************************************)
+
+Vertices(G) == {v \in V : \E w \in V : <<v,w>> \in G \/ <<w,v>> \in G}
+
+IsDigraph(G) == \A e \in G : e[1] \in Vertices(G) /\ e[2] \in Vertices(G) 
+    
+Children(W, G) == UNION {{w \in Vertices(G) : <<v,w>> \in G} : v \in W} 
+            
+RECURSIVE Reachable(_,_,_)
+Reachable(v1, v2, G) == \* CAUTION: does not terminate if there is a cycle reachable from v1
+    \/  v1 = v2
+    \/  <<v1,v2>> \in G
+    \/  \E v3 \in Children({v1}, G) : Reachable(v3, v2, G)
+        
+Compatible(v, w, G) == Reachable(v, w, G) \/ Reachable(w, v, G)
+
+RECURSIVE Distance(_,_,_)
+Distance(W, v, G) == \* W is a set of vertices
+    CASE
+        v \in W -> 0
+    []  v \in Children(W,G) -> 1
+    []  OTHER -> 1 + Distance(Children(W,G), v, G)
+    
+ 
+(***************************************************************************)
+(* Now we're ready for the algorithm.                                      *)
+(*                                                                         *)
+(* We want to show that the height of two competing tips differ at most by *)
+(* 1.                                                                      *)
+(***************************************************************************)
+
+Root == CHOOSE v \in V : TRUE
 
 Max(E) == CHOOSE e \in E : \A f \in E : f <= e
 
 (* 
 --algorithm Streamlet {
     variables
-        chains = <<{ChainRoot}, {}>>, \* the digraph formed by the nodes' votes
-        vote = [p \in P |-> [r \in Round \ {0} |-> <<>>]], \* the votes cast by the processes
+        height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
+        votes = [p \in P |-> [r \in Round |-> <<>>]], \* the votes cast by the processes
     define {
-        Notarized(v,r) ==
-            \/  (v = ChainRoot /\ r = 0) 
-            \/  /\  r > 0 /\ v \in V 
-                /\  \E Q \in Quorum : \A p \in Q : vote[p][r] = v 
-        Height(v) == Distance({ChainRoot}, v, chains)
+        G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
+        Notarized(r,v) == 
+            \/  (r = 0 /\ v = Root) 
+            \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>   
+        Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
         (*******************************************************************)
         (* By Inv1, we know that if a tip is more than on behind, it can   *)
         (* never be built on anymore.  So we can decide when we detect     *)
@@ -35,44 +69,51 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
         (* when two vertices are notarized in a row.                       *)
         (*******************************************************************)
         \* Decided vertices:
-        Decided(v) == \E v1,v3 \in V : \E r \in Round : 
+        Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
-            /\  Notarized(v1,r) /\  Notarized(v,r+1) /\  Notarized(v3,r+2)
-            /\  v \in Children({v1}, chains) /\ v3 \in Children({v}, chains) 
+            /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
+            /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G) 
         \* Main safety property:
-        Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Compatible(w, v, chains)
+        Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
         BaitInv1 == \A v \in V : \neg Decided(v)
     }
     process (proc \in P)
         variables 
-            round = 1, \* current round 
-            height = 0, \* height of the longest notarized chain seen so far
+            round = 1, \* current round
     {
 l1:     while (TRUE) { \* extend a longer notarized chain with a vote and go to the next round
             when round \in Round; \* for TLC            
-                with (v \in Vertices(chains)) { \* the notarized vertice we're going to extend
-                    when Height(v) >= height /\ \E r \in Round : r < round /\ Notarized(v,r);
-                    with (w \in (V \ Vertices(chains)) \cup Children({v}, chains)) { \* pick a fresh vertice or vote for an existing child of v
-                        chains := AddEdge(v, w, chains);
-                        vote[self][round] := w;
+                with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
+                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
+                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
+                        votes[self][round] := <<v,w>>;
                     };
-                    height := Height(v);
+                    height[self] := Height(v);
                     round := round +1;
                 }
             }
         }
     }
 }
+(*
+MyInit == 
+/\  height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
+/\  round = (p1 :> 4 @@ p2 :> 3 @@ p3 :> 4)
+/\  votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1,v5>>, <<>>, <<>>>> @@
+  p2 :> <<<<v1, v3>>, <<v3,v2>>, <<>>, <<>>, <<>>>> @@
+  p3 :> <<<<>>, <<>>, <<v1,v5>>, <<>>, <<>>>> )
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "a8cac0b4" /\ chksum(tla) = "5303f4ee")
-VARIABLES chains, vote
+
+*)
+\* BEGIN TRANSLATION (chksum(pcal) = "13aaa2b2" /\ chksum(tla) = "372eae52")
+VARIABLES height, votes
 
 (* define statement *)
-Notarized(v,r) ==
-    \/  (v = ChainRoot /\ r = 0)
-    \/  /\  r > 0 /\ v \in V
-        /\  \E Q \in Quorum : \A p \in Q : vote[p][r] = v
-Height(v) == Distance({ChainRoot}, v, chains)
+G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
+Notarized(r,v) ==
+    \/  (r = 0 /\ v = Root)
+    \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>
+Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
 
 
 
@@ -80,33 +121,31 @@ Height(v) == Distance({ChainRoot}, v, chains)
 
 
 
-Decided(v) == \E v1,v3 \in V : \E r \in Round :
+Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
     /\  r+2 <= Max(Round)
-    /\  Notarized(v1,r) /\  Notarized(v,r+1) /\  Notarized(v3,r+2)
-    /\  v \in Children({v1}, chains) /\ v3 \in Children({v}, chains)
+    /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
+    /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G)
 
-Safety == \A v,w \in Vertices(chains) : Decided(v) /\ Decided(w) => Compatible(w, v, chains)
+Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
 BaitInv1 == \A v \in V : \neg Decided(v)
 
-VARIABLES round, height
+VARIABLE round
 
-vars == << chains, vote, round, height >>
+vars == << height, votes, round >>
 
 ProcSet == (P)
 
 Init == (* Global variables *)
-        /\ chains = <<{ChainRoot}, {}>>
-        /\ vote = [p \in P |-> [r \in Round \ {0} |-> <<>>]]
+        /\ height = [p \in P |-> 0]
+        /\ votes = [p \in P |-> [r \in Round |-> <<>>]]
         (* Process proc *)
         /\ round = [self \in P |-> 1]
-        /\ height = [self \in P |-> 0]
 
 proc(self) == /\ round[self] \in Round
-              /\ \E v \in Vertices(chains):
-                   /\ Height(v) >= height[self] /\ \E r \in Round : r < round[self] /\ Notarized(v,r)
-                   /\ \E w \in (V \ Vertices(chains)) \cup Children({v}, chains):
-                        /\ chains' = AddEdge(v, w, chains)
-                        /\ vote' = [vote EXCEPT ![self][round[self]] = w]
+              /\ \E v \in Vertices(G) \cup {Root}:
+                   /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
+                   /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
+                        votes' = [votes EXCEPT ![self][round[self]] = <<v,w>>]
                    /\ height' = [height EXCEPT ![self] = Height(v)]
                    /\ round' = [round EXCEPT ![self] = round[self] +1]
 
@@ -117,5 +156,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Sun Dec 19 19:17:49 PST 2021 by nano
+\* Last modified Mon Dec 20 09:30:53 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

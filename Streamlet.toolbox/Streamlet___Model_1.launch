@@ -1,38 +1,60 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="org.lamport.tla.toolbox.tool.tlc.modelCheck">
+    <stringAttribute key="TLCCmdLineParameters" value=""/>
+    <intAttribute key="collectCoverage" value="0"/>
     <stringAttribute key="configurationName" value="Model_1"/>
+    <booleanAttribute key="deferLiveness" value="false"/>
+    <intAttribute key="dfidDepth" value="100"/>
+    <booleanAttribute key="dfidMode" value="false"/>
     <intAttribute key="distributedFPSetCount" value="0"/>
     <stringAttribute key="distributedNetworkInterface" value="192.168.200.158"/>
     <intAttribute key="distributedNodesCount" value="1"/>
     <stringAttribute key="distributedTLC" value="off"/>
-    <intAttribute key="fpIndex" value="97"/>
+    <stringAttribute key="distributedTLCVMArgs" value=""/>
+    <intAttribute key="fpBits" value="1"/>
+    <intAttribute key="fpIndex" value="100"/>
+    <booleanAttribute key="fpIndexRandom" value="true"/>
     <intAttribute key="maxHeapSize" value="25"/>
+    <intAttribute key="maxSetSize" value="1000000"/>
+    <booleanAttribute key="mcMode" value="true"/>
     <stringAttribute key="modelBehaviorInit" value=""/>
     <stringAttribute key="modelBehaviorNext" value=""/>
-    <stringAttribute key="modelBehaviorSpec" value="Spec"/>
+    <stringAttribute key="modelBehaviorSpec" value="MyInit /\ [][Next]_vars"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
-    <stringAttribute key="modelBehaviorVars" value="chains, round, vote, height"/>
+    <stringAttribute key="modelBehaviorVars" value="round, height, votes"/>
     <stringAttribute key="modelComments" value=""/>
     <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
     <listAttribute key="modelCorrectnessInvariants">
-        <listEntry value="0Safety"/>
-        <listEntry value="1BaitInv1"/>
+        <listEntry value="1Safety"/>
+        <listEntry value="0BaitInv1"/>
     </listAttribute>
     <listAttribute key="modelCorrectnessProperties"/>
-    <intAttribute key="modelEditorOpenTabs" value="8"/>
+    <intAttribute key="modelEditorOpenTabs" value="14"/>
     <stringAttribute key="modelExpressionEval" value=""/>
+    <stringAttribute key="modelParameterActionConstraint" value=""/>
     <listAttribute key="modelParameterConstants">
         <listEntry value="P;;{p1, p2, p3};1;1"/>
-        <listEntry value="V;;{v1, v2, v3, v4, v5, v6, v7};1;1"/>
-        <listEntry value="Round;;0..4;0;0"/>
+        <listEntry value="V;;{v1, v2, v3, v4, v5, v6};1;1"/>
+        <listEntry value="Round;;1..5;0;0"/>
         <listEntry value="Quorum;;{Q\in SUBSET P: 2*Cardinality(Q)&gt;Cardinality(P)};0;0"/>
     </listAttribute>
+    <stringAttribute key="modelParameterContraint" value=""/>
+    <listAttribute key="modelParameterDefinitions"/>
+    <stringAttribute key="modelParameterModelValues" value="{}"/>
+    <stringAttribute key="modelParameterNewDefinitions" value="MyInit == &#10;/\  height = (p1 :&gt; 0 @@ p2 :&gt; 1 @@ p3 :&gt; 0)&#10;/\  round = (p1 :&gt; 4 @@ p2 :&gt; 3 @@ p3 :&gt; 4)&#10;/\  votes = ( p1 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; @@&#10;  p2 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;v3,v2&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; @@&#10;  p3 :&gt; &lt;&lt;&lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; )"/>
     <intAttribute key="modelVersion" value="20191005"/>
     <intAttribute key="numberOfWorkers" value="4"/>
+    <booleanAttribute key="recover" value="false"/>
     <stringAttribute key="result.mail.address" value=""/>
+    <intAttribute key="simuAril" value="-1"/>
+    <intAttribute key="simuDepth" value="100"/>
+    <intAttribute key="simuSeed" value="-1"/>
     <stringAttribute key="specName" value="Streamlet"/>
     <stringAttribute key="tlcResourcesProfile" value="local custom"/>
     <listAttribute key="traceExploreExpressions">
         <listEntry value="1[v \in V |-&gt; Decided(v)]"/>
+        <listEntry value="1Vertices(G)"/>
     </listAttribute>
+    <stringAttribute key="view" value=""/>
+    <booleanAttribute key="visualizeStateGraph" value="false"/>
 </launchConfiguration>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.lamport.tla.toolbox.tool.tlc.modelCheck">
+    <stringAttribute key="TLCCmdLineParameters" value=""/>
+    <intAttribute key="collectCoverage" value="0"/>
+    <stringAttribute key="configurationName" value="Model_1"/>
+    <booleanAttribute key="deferLiveness" value="false"/>
+    <intAttribute key="dfidDepth" value="100"/>
+    <booleanAttribute key="dfidMode" value="false"/>
+    <intAttribute key="distributedFPSetCount" value="0"/>
+    <stringAttribute key="distributedNetworkInterface" value="192.168.200.158"/>
+    <intAttribute key="distributedNodesCount" value="1"/>
+    <stringAttribute key="distributedTLC" value="off"/>
+    <stringAttribute key="distributedTLCVMArgs" value="-Xss100m"/>
+    <intAttribute key="fpBits" value="1"/>
+    <intAttribute key="fpIndex" value="61"/>
+    <booleanAttribute key="fpIndexRandom" value="true"/>
+    <intAttribute key="maxHeapSize" value="25"/>
+    <intAttribute key="maxSetSize" value="1000000"/>
+    <booleanAttribute key="mcMode" value="true"/>
+    <stringAttribute key="modelBehaviorInit" value=""/>
+    <stringAttribute key="modelBehaviorNext" value=""/>
+    <stringAttribute key="modelBehaviorSpec" value="Spec"/>
+    <intAttribute key="modelBehaviorSpecType" value="1"/>
+    <stringAttribute key="modelBehaviorVars" value="height, votes"/>
+    <stringAttribute key="modelComments" value=""/>
+    <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
+    <listAttribute key="modelCorrectnessInvariants"/>
+    <listAttribute key="modelCorrectnessProperties">
+        <listEntry value="1Temporal1"/>
+        <listEntry value="0BaitTemporal1"/>
+    </listAttribute>
+    <intAttribute key="modelEditorOpenTabs" value="12"/>
+    <stringAttribute key="modelExpressionEval" value=""/>
+    <listAttribute key="modelParameterConstants">
+        <listEntry value="V;;{v1, v2, v3, v4, v5};1;0"/>
+        <listEntry value="P;;{p1, p2, p3};1;0"/>
+        <listEntry value="Quorum;;{Q \in SUBSET P : 2*Cardinality(Q) &gt; Cardinality(P)};0;0"/>
+    </listAttribute>
+    <intAttribute key="modelVersion" value="20191005"/>
+    <intAttribute key="numberOfWorkers" value="4"/>
+    <booleanAttribute key="recover" value="false"/>
+    <stringAttribute key="result.mail.address" value=""/>
+    <intAttribute key="simuAril" value="-1"/>
+    <intAttribute key="simuDepth" value="100"/>
+    <intAttribute key="simuSeed" value="-1"/>
+    <stringAttribute key="specName" value="CrashFault"/>
+    <stringAttribute key="tlcResourcesProfile" value="local custom"/>
+    <listAttribute key="traceExploreExpressions">
+        <listEntry value="1{v \in V : Tip(v)}"/>
+        <listEntry value="0[v \in Vertices(G)\{Root} |-&gt; Height(v)]"/>
+    </listAttribute>
+    <stringAttribute key="view" value=""/>
+    <booleanAttribute key="visualizeStateGraph" value="false"/>
+</launchConfiguration>

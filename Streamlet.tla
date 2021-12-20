@@ -59,8 +59,9 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
     define {
         G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
         Notarized(r,v) == 
-            \/  (r = 0 /\ v = Root) 
-            \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>   
+            IF r = 0
+            THEN v = Root
+            ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
         Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
         (*******************************************************************)
         (* By Inv1, we know that if a tip is more than on behind, it can   *)
@@ -81,17 +82,20 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
         variables 
             round = 1, \* current round
     {
-l1:     while (TRUE) { \* extend a longer notarized chain with a vote and go to the next round
+l1:     while (TRUE) { 
             when round \in Round; \* for TLC            
-                with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
-                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
-                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
-                        votes[self][round] := <<v,w>>;
+            either { \* extend a longer notarized chain with a vote
+                    with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
+                        when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
+                        with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
+                            votes[self][round] := <<v,w>>;
+                        };
+                        height[self] := Height(v);
                     };
-                    height[self] := Height(v);
-                    round := round +1;
-                }
-            }
+            } or { \* skip the round
+                skip;
+            };
+            round := round +1; \* go to the next round
         }
     }
 }
@@ -105,14 +109,15 @@ MyInit ==
 *)
 
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "13aaa2b2" /\ chksum(tla) = "372eae52")
+\* BEGIN TRANSLATION (chksum(pcal) = "988442fb" /\ chksum(tla) = "53b9bfd2")
 VARIABLES height, votes
 
 (* define statement *)
 G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
 Notarized(r,v) ==
-    \/  (r = 0 /\ v = Root)
-    \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>
+    IF r = 0
+    THEN v = Root
+    ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
 Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
 
 
@@ -142,12 +147,14 @@ Init == (* Global variables *)
         /\ round = [self \in P |-> 1]
 
 proc(self) == /\ round[self] \in Round
-              /\ \E v \in Vertices(G) \cup {Root}:
-                   /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
-                   /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
-                        votes' = [votes EXCEPT ![self][round[self]] = <<v,w>>]
-                   /\ height' = [height EXCEPT ![self] = Height(v)]
-                   /\ round' = [round EXCEPT ![self] = round[self] +1]
+              /\ \/ /\ \E v \in Vertices(G) \cup {Root}:
+                         /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
+                         /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
+                              votes' = [votes EXCEPT ![self][round[self]] = <<v,w>>]
+                         /\ height' = [height EXCEPT ![self] = Height(v)]
+                 \/ /\ TRUE
+                    /\ UNCHANGED <<height, votes>>
+              /\ round' = [round EXCEPT ![self] = round[self] +1]
 
 Next == (\E self \in P: proc(self))
 
@@ -156,5 +163,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 20 09:30:53 PST 2021 by nano
+\* Last modified Mon Dec 20 10:48:01 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

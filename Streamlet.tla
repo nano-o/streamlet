@@ -38,18 +38,11 @@ Distance(W, v, G) == \* W is a set of vertices
         v \in W -> 0
     []  v \in Children(W,G) -> 1
     []  OTHER -> 1 + Distance(Children(W,G), v, G)
-    
- 
-(***************************************************************************)
-(* Now we're ready for the algorithm.                                      *)
-(*                                                                         *)
-(* We want to show that the height of two competing tips differ at most by *)
-(* 1.                                                                      *)
-(***************************************************************************)
 
 Root == CHOOSE v \in V : TRUE
 
 Max(E) == CHOOSE e \in E : \A f \in E : f <= e
+
 
 (* 
 --algorithm Streamlet {
@@ -63,12 +56,6 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
             THEN v = Root
             ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
         Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
-        (*******************************************************************)
-        (* By Inv1, we know that if a tip is more than on behind, it can   *)
-        (* never be built on anymore.  So we can decide when we detect     *)
-        (* that all competing tips must be more than one behind.  This is  *)
-        (* when two vertices are notarized in a row.                       *)
-        (*******************************************************************)
         \* Decided vertices:
         Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
@@ -80,36 +67,27 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
     }
     process (proc \in P)
         variables 
-            round = 1, \* current round
+            round = 1, \* the current round of the process
     {
 l1:     while (TRUE) { 
             when round \in Round; \* for TLC            
             either { \* extend a longer notarized chain with a vote
-                    with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
-                        when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
-                        with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
-                            votes[self][round] := <<v,w>>;
-                        };
-                        height[self] := Height(v);
-                    };
-            } or { \* skip the round
-                skip;
+                with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
+                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
+                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) \* pick a fresh vertice or vote for an existing child of v
+                        votes[self][round] := <<v,w>>;
+                    height[self] := Height(v);
+                }
+            } 
+            or { \* skip the round
+                skip
             };
-            round := round +1; \* go to the next round
+            round := round + 1 \* go to the next round
         }
     }
 }
-(*
-MyInit == 
-/\  height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\  round = (p1 :> 4 @@ p2 :> 3 @@ p3 :> 4)
-/\  votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1,v5>>, <<>>, <<>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3,v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1,v5>>, <<>>, <<>>>> )
 *)
-
-*)
-\* BEGIN TRANSLATION (chksum(pcal) = "988442fb" /\ chksum(tla) = "53b9bfd2")
+\* BEGIN TRANSLATION (chksum(pcal) = "988442fb" /\ chksum(tla) = "9ff9ba38")
 VARIABLES height, votes
 
 (* define statement *)
@@ -154,7 +132,7 @@ proc(self) == /\ round[self] \in Round
                          /\ height' = [height EXCEPT ![self] = Height(v)]
                  \/ /\ TRUE
                     /\ UNCHANGED <<height, votes>>
-              /\ round' = [round EXCEPT ![self] = round[self] +1]
+              /\ round' = [round EXCEPT ![self] = round[self] + 1]
 
 Next == (\E self \in P: proc(self))
 
@@ -163,5 +141,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 20 10:48:01 PST 2021 by nano
+\* Last modified Tue Dec 21 08:56:17 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

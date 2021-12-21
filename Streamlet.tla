@@ -42,6 +42,7 @@ Distance(W, v, G) == \* W is a set of vertices
 Root == CHOOSE v \in V : TRUE
 
 Max(E) == CHOOSE e \in E : \A f \in E : f <= e
+Abs(n) == IF n < 0 THEN -n ELSE n
 
 
 (* 
@@ -56,6 +57,15 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
             THEN v = Root
             ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
         Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
+        \* The tip of a notarized chain:
+        Tip(v) == 
+            /\  v \in Vertices(G)
+            /\  \E r \in Round : Notarized(r,v)
+            /\  \A w \in Vertices(G) : \E r \in Round : Notarized(r,w) /\ v # w => \neg Reachable(v, w, G)
+        \* A tip is still competing if a quorum has a lower or equal notarized height:
+        Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
+        \* The heights of two competing tips differ at most by 1:   
+        Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
         \* Decided vertices:
         Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
@@ -87,7 +97,7 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "988442fb" /\ chksum(tla) = "9ff9ba38")
+\* BEGIN TRANSLATION (chksum(pcal) = "42ce73c7" /\ chksum(tla) = "b768f8d0")
 VARIABLES height, votes
 
 (* define statement *)
@@ -98,11 +108,14 @@ Notarized(r,v) ==
     ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
 Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
 
+Tip(v) ==
+    /\  v \in Vertices(G)
+    /\  \E r \in Round : Notarized(r,v)
+    /\  \A w \in Vertices(G) : \E r \in Round : Notarized(r,w) /\ v # w => \neg Reachable(v, w, G)
 
+Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
 
-
-
-
+Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
 
 Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
     /\  r+2 <= Max(Round)
@@ -141,5 +154,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Tue Dec 21 08:56:17 PST 2021 by nano
+\* Last modified Tue Dec 21 08:57:36 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

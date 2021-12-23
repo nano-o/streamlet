@@ -11,7 +11,7 @@ CONSTANTS
         P \* The set of processes
     ,   V \* The set of values
     ,   Quorum \* The set of quorums
-    ,   Round \* The set of rounds. Should be of the form 1..N
+    ,   Round \* The set of rounds. Should be of the form 1..N       
 
 (***************************************************************************)
 (* First we need a few notions about directed graphs.  A directed graph is *)
@@ -43,14 +43,18 @@ Root == CHOOSE v \in V : TRUE
 
 Max(E) == CHOOSE e \in E : \A f \in E : f <= e
 Abs(n) == IF n < 0 THEN -n ELSE n
-
+    
+Num == \* assigns a process number to each process
+    CHOOSE f \in [P -> 1..Cardinality(P)] : 
+        \A p1,p2 \in P : p1 # p2 => f[p1] # f[p2]
+Proc(n) == \* the inverse of Num
+    CHOOSE p \in P : Num[p] = n   
 
 (* 
 --algorithm Streamlet {
     variables
         height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
         votes = [p \in P |-> [r \in Round |-> <<>>]], \* the votes cast by the processes
-        round = [p \in P |-> 1] \* the current round of a process
     define {
         G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
         Notarized(r,v) == 
@@ -76,29 +80,36 @@ Abs(n) == IF n < 0 THEN -n ELSE n
         Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
         BaitInv1 == \A v \in V : \neg Decided(v)
     }
-    process (proc \in P) {
-l1:     while (TRUE) { 
-            when round[self] \in Round; \* stop if we ran out of rounds
-            when \A p \in P : round[self] = round[p] \/ round[self] = round[p] - 1; \* synchronous round model
-            either { \* extend a longer notarized chain with a vote
+    process (scheduler \in {"sched"})
+        variables
+            round = 1, \* the current round
+            n = 1; \* the next process to take a step
+    {
+l1:     while (TRUE) {
+            when round \in Round; \* stop if we ran out of rounds
+            with (proc = Proc(n))
+            either { \* proc extends a longer notarized chain with a vote
                 with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
-                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v);
+                    when Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
                     with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) \* pick a fresh vertice or vote for an existing child of v
                         \* note that, in the original algorithm, blocks are unique due to hash chaining
-                        votes[self][round[self]] := <<v,w>>;
-                    height[self] := Height(v);
+                        votes[proc][round] := <<v,w>>;
+                    height[proc] := Height(v);
                 }
             } 
-            or { \* skip the round
+            or { \* proc skips the round
                 skip
             };
-            round[self] := round[self] + 1 \* go to the next round
+            n := (n%Cardinality(P)) + 1;
+            if (n = 1) { \* we scheduled all processes
+                round := round + 1; \* go to the next round
+            }
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "eec9f378" /\ chksum(tla) = "7c12db08")
-VARIABLES height, votes, round
+\* BEGIN TRANSLATION (chksum(pcal) = "9c6ee374" /\ chksum(tla) = "22af30a3")
+VARIABLES height, votes
 
 (* define statement *)
 G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
@@ -125,33 +136,40 @@ Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
 Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
 BaitInv1 == \A v \in V : \neg Decided(v)
 
+VARIABLES round, n
 
-vars == << height, votes, round >>
+vars == << height, votes, round, n >>
 
-ProcSet == (P)
+ProcSet == ({"sched"})
 
 Init == (* Global variables *)
         /\ height = [p \in P |-> 0]
         /\ votes = [p \in P |-> [r \in Round |-> <<>>]]
-        /\ round = [p \in P |-> 1]
+        (* Process scheduler *)
+        /\ round = [self \in {"sched"} |-> 1]
+        /\ n = [self \in {"sched"} |-> 1]
 
-proc(self) == /\ round[self] \in Round
-              /\ \A p \in P : round[self] = round[p] \/ round[self] = round[p] - 1
-              /\ \/ /\ \E v \in Vertices(G) \cup {Root}:
-                         /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
-                         /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
-                              votes' = [votes EXCEPT ![self][round[self]] = <<v,w>>]
-                         /\ height' = [height EXCEPT ![self] = Height(v)]
-                 \/ /\ TRUE
-                    /\ UNCHANGED <<height, votes>>
-              /\ round' = [round EXCEPT ![self] = round[self] + 1]
+scheduler(self) == /\ round[self] \in Round
+                   /\ LET proc == Proc(n[self]) IN
+                        \/ /\ \E v \in Vertices(G) \cup {Root}:
+                                /\ Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
+                                /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
+                                     votes' = [votes EXCEPT ![proc][round[self]] = <<v,w>>]
+                                /\ height' = [height EXCEPT ![proc] = Height(v)]
+                        \/ /\ TRUE
+                           /\ UNCHANGED <<height, votes>>
+                   /\ n' = [n EXCEPT ![self] = (n[self]%Cardinality(P)) + 1]
+                   /\ IF n'[self] = 1
+                         THEN /\ round' = [round EXCEPT ![self] = round[self] + 1]
+                         ELSE /\ TRUE
+                              /\ round' = round
 
-Next == (\E self \in P: proc(self))
+Next == (\E self \in {"sched"}: scheduler(self))
 
 Spec == Init /\ [][Next]_vars
 
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Wed Dec 22 19:56:53 PST 2021 by nano
+\* Last modified Wed Dec 22 20:21:55 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

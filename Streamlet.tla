@@ -8,7 +8,7 @@
 EXTENDS Integers, TLC, FiniteSets
 
 CONSTANTS
-        P \* The set of processors
+        P \* The set of processes
     ,   V \* The set of values
     ,   Quorum \* The set of quorums
     ,   Round \* The set of rounds. Should be of the form 1..N
@@ -50,6 +50,7 @@ Abs(n) == IF n < 0 THEN -n ELSE n
     variables
         height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
         votes = [p \in P |-> [r \in Round |-> <<>>]], \* the votes cast by the processes
+        round = [p \in P |-> 1] \* the current round of a process
     define {
         G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
         Notarized(r,v) == 
@@ -70,35 +71,34 @@ Abs(n) == IF n < 0 THEN -n ELSE n
         Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
             /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
-            /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G) 
+            /\  <<v1,v>> \in G /\ <<v,v3>> \in G 
         \* Main safety property:
         Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
         BaitInv1 == \A v \in V : \neg Decided(v)
     }
-    process (proc \in P)
-        variables 
-            round = 1, \* the current round of the process
-    {
+    process (proc \in P) {
 l1:     while (TRUE) { 
-            when round \in Round; \* for TLC            
+            when round[self] \in Round; \* stop if we ran out of rounds
+            when \A p \in P : round[self] = round[p] \/ round[self] = round[p] - 1; \* synchronous round model
             either { \* extend a longer notarized chain with a vote
                 with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
-                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
+                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v);
                     with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) \* pick a fresh vertice or vote for an existing child of v
-                        votes[self][round] := <<v,w>>;
+                        \* note that, in the original algorithm, blocks are unique due to hash chaining
+                        votes[self][round[self]] := <<v,w>>;
                     height[self] := Height(v);
                 }
             } 
             or { \* skip the round
                 skip
             };
-            round := round + 1 \* go to the next round
+            round[self] := round[self] + 1 \* go to the next round
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "42ce73c7" /\ chksum(tla) = "b768f8d0")
-VARIABLES height, votes
+\* BEGIN TRANSLATION (chksum(pcal) = "eec9f378" /\ chksum(tla) = "7c12db08")
+VARIABLES height, votes, round
 
 (* define statement *)
 G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
@@ -120,12 +120,11 @@ Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) -
 Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
     /\  r+2 <= Max(Round)
     /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
-    /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G)
+    /\  <<v1,v>> \in G /\ <<v,v3>> \in G
 
 Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
 BaitInv1 == \A v \in V : \neg Decided(v)
 
-VARIABLE round
 
 vars == << height, votes, round >>
 
@@ -134,10 +133,10 @@ ProcSet == (P)
 Init == (* Global variables *)
         /\ height = [p \in P |-> 0]
         /\ votes = [p \in P |-> [r \in Round |-> <<>>]]
-        (* Process proc *)
-        /\ round = [self \in P |-> 1]
+        /\ round = [p \in P |-> 1]
 
 proc(self) == /\ round[self] \in Round
+              /\ \A p \in P : round[self] = round[p] \/ round[self] = round[p] - 1
               /\ \/ /\ \E v \in Vertices(G) \cup {Root}:
                          /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
                          /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
@@ -154,5 +153,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Tue Dec 21 08:57:36 PST 2021 by nano
+\* Last modified Wed Dec 22 19:56:53 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

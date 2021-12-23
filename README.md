@@ -1,5 +1,4 @@
-The Streamlet blockchain consensus algorithm is arguably one of the simplest
-such algorithms.
+The Streamlet blockchain consensus algorithm is arguably one of the simplest such algorithms.
 
 In [their presentation of the Streamlet algorithm](https://eprint.iacr.org/2020/088.pdf), Chan and Shi provide a convincing safety proof, which nevertheless left me wanting to understanding the algorithm on a more intuitive level.
 
@@ -9,22 +8,28 @@ Moreover, I illustrate my reasoning with TLA+ models, including claims that can 
 
 # The Streamlet algorithm
 
-We consider the Streamlet algorithm in a message-passing, crash-stop network (where nodes fail by stopping, and otherwise follow the protocol) with a fixed number N of nodes and where a strict majority of the nodes do not fail.
-The goal of the Streamlet algorithm is to enable the nodes to iteratively construct a unique and ever-growing blockchain.
+The goal of the Streamlet algorithm is to enable a fixed set of nodes in a message-passing network to iteratively construct a unique and ever-growing blockchain.
+Although many such algorithms existed before Streamlet, Streamlet is striking because of the simplicity of the rules that nodes must follow.
 
-Although many such algorithms existed before Streamlet, Streamlet is striking because of the simplicity of the rule that nodes follow.
+Streamlet can tolerate malicious nodes, but, to simplify things, here we will consider only crash-stop failures.
+We assume that we have a fixed set of N nodes and that only a strict minority of the nodes may crash.
 
-The protocol evolves in consecutive epochs (1,2,3,...) , where each epoch has a unique, pre-determined leader (e.g. the leader of epoch i is node (i mod N)+1, where N is the number of nodes).
-Each epoch e works as follows:
-- The leader proposes a new block (with epoch number e) that extends one of the longest notarized chain that the leader knows of (where notarized is defined below).
+The protocol evolves in consecutive epochs (1,2,3,...) during which nodes vote for blocks according to the rules below.
+A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); a special, unique genesis block that has epoch number 0.
+A set of blocks can be seen as a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`, and a set of blocks forms a valid blockchain when every block is reachable from the genesis block.
+Note that, with this definition, a blockchain may very well be a tree (i.e. it may contain forks).
+
+Each epoch has a unique, pre-determined leader (e.g. the leader of epoch i is node (i mod N)+1, where N is the number of nodes).
+In each epoch e, the nodes must follow the following rules:
+- The leader proposes a new block (with epoch number e) that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
 - Every node votes for the leader's proposal as long as the proposal extends one of the longest notarized chains that the node knows of.
-- A block is notarized when it has gathered votes from a strict majority of the nodes, and a chain is notarized when all its blocks are.
+- A block is notarized when it has gathered votes from a strict majority of the nodes in the same epoch, and a chain is notarized when all its blocks are.
 - In any notarized chain including three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second is final.
 
 TODO: describe an interesting execution.
 
 The algorithm guarantees that if two chains are final, then one is a prefix of the other.
-In other words, there are no forks.
+In other words, there is a unique, linear, fork-less longest final chain.
 This is the consistency property of the algorithm.
 
 The Streamlet algorithm also never gets stuck; moreover, under eventual synchrony, the finalized chain is guaranteed to keep growing.

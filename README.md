@@ -16,14 +16,13 @@ We assume that we have a fixed set of N nodes and that only a strict minority of
 
 The protocol evolves in consecutive epochs (1,2,3,...) during which nodes vote for blocks according to the rules below.
 A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); a special, unique genesis block that has epoch number 0.
-A set of blocks can be seen as a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`, and a set of blocks forms a valid blockchain when every block is reachable from the genesis block.
+A set of blocks can be seen as a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`, and a set of blocks forms a blockchain when every block is reachable from the genesis block.
 Note that, with this definition, a blockchain may very well be a tree (i.e. it may contain forks).
 
-Each epoch has a unique, pre-determined leader (e.g. the leader of epoch i is node (i mod N)+1, where N is the number of nodes).
-In each epoch e, the nodes must follow the following rules:
+Each epoch e has a unique, pre-determined leader (e.g. node (e mod N)+1), and nodes must follow the following rules:
 - The leader proposes a new block (with epoch number e) that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
 - Every node votes for the leader's proposal as long as the proposal extends one of the longest notarized chains that the node knows of.
-- A block is notarized when it has gathered votes from a strict majority of the nodes in the same epoch, and a chain is notarized when all its blocks are.
+- A block is notarized when it has gathered votes from a strict majority of the nodes in the same epoch, and a chain is notarized when all its blocks (except the genesis block) are.
 - In any notarized chain including three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second is final.
 
 TODO: describe an interesting execution.
@@ -38,25 +37,29 @@ This is the liveness property of the algorithm.
 The main question we will now address is: why does the consistency property hold?
 Hopefully, we'll look at liveness in another post.
 
-# An even simpler algorithm
-
-To understand why Streamlet's consistency property holds, let us consider an even simpler algorithm that I call the pre-Streamlet algorithm.
-This algorithm has no epochs and no leaders.
-Instead, every node repeatedly does the following:
-- Pick a notarized chain whose length is greater or equal to the length of every chain that the node has picked so far.
-- Vote for an arbitrary block that extends the chain just picked.
-As before, we say that a block is notarized when a strict majority of the nodes have voted for it.
+# Intuition behind the safety property
 
 This algorithm has an interesting property: consider two maximal, notarized chains c1 and c2 such that the length of c1 is smaller than the length of c2 minus one (e.g. c1 has length 3 and c2 has length 5); then no block will ever be notarized on top of c1.
 
-# Back to Streamlet
+Proof:
+Since c2 is notarized, a strict majority of the nodes voted to extend the predecessor of `c2`, and thus they all have seen a chain of length at least `length(c2)-1`.
+Moreover, since nodes only vote to extend one of the longest chains they know of, those nodes will never vote to extend `c1` because it has a length strictly smaller than `length(c2)-1`.
+Thus, because two strict majorities intersect, no node extending `c1` will ever gather a strict majority of votes.
+QED.
 
-As we have observed, in the pre-Streamlet algorithm, if we have two maximal, notarized chains c1 and c2 such that the length of c1 is smaller than the length of c2 minus one (e.g. c1 has length 3 and c2 has length 5), then no block will ever be notarized on top of c1.
-Thus, when a notarized chain c becomes two blocks longer than any other chain, we know that the other chains will never grow again and can be abandoned, and we can consider c final without risking any disagreement.
+This shows that, when a notarized chain c becomes two blocks longer than any other chain, we know that the other chains will never grow again and can be abandoned, and we can consider c final without risking any disagreement.
 
-But how do nodes detect that a chain has become 2 blocks longer than any other chain? That it difficult to do in an asynchronous system because a node may not know of all the notarized blocks.
+But how do nodes detect that a notarized chain has become 2 blocks longer than any other notarized chain? That it difficult to do in an asynchronous system because a node may not know of all the notarized blocks.
 The Streamlet algorithm solves this problem using epochs: since nodes only vote once per epoch, after three consecutive epochs extending the same notarized chain c, we can be sure that c is now two blocks longer than any other chain.
-This is because, since c gets notarized, it is at most one block shorter than the longest notarized chains. Thus, after adding three blocks to it, c is now two blocks longer than any other chain.
+
+Proof:
+Since c gets extended, c is at most one block shorter than the longest notarized chains.
+Thus, after adding three blocks to it, c is now two blocks longer than any other notarized chain.
+QED.
+
+# Streamlet in TLA+
+
+# Liveness
 
 # Remarks
 
@@ -65,111 +68,3 @@ In contrast, in the model of the present post, nodes independently learn about n
 Thus, I think that the model of this post more faithfully represents what can happen in an asynchronous system.
 
 Stay tuned for a discussion of Streamlet's liveness property.
-
-# TLC counter-example in PreStreamlet
-
-```
-Error: The following behavior constitutes a counter-example:
-
-State 1: <Initial predicate>
-/\ height = (p1 :> 0 @@ p2 :> 0 @@ p3 :> 0)
-/\ votes = (p1 :> {<<v1, v3>>, <<v1, v5>>} @@ p2 :> {<<v1, v3>>} @@ p3 :> {<<v1, v5>>})
-
-State 2: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 0 @@ p3 :> 0)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>} @@
-  p3 :> {<<v1, v5>>} )
-
-State 3: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>, <<v3, v2>>} @@
-  p3 :> {<<v1, v5>>} )
-
-State 4: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>} @@
-  p3 :> {<<v1, v5>>} )
-
-State 5: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 0)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
-  p3 :> {<<v1, v5>>} )
-
-State 6: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 2)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
-  p3 :> {<<v1, v5>>, <<v6, v4>>} )
-
-State 7: <proc line 120, col 15 to line 124, col 71 of module PreStreamlet>
-/\ height = (p1 :> 1 @@ p2 :> 2 @@ p3 :> 2)
-/\ votes = ( p1 :> {<<v1, v3>>, <<v1, v5>>, <<v3, v2>>, <<v5, v6>>} @@
-  p2 :> {<<v1, v3>>, <<v3, v2>>, <<v5, v6>>, <<v6, v4>>} @@
-  p3 :> {<<v1, v5>>, <<v6, v4>>} )
-```
-
-# TLC counter-example in Streamlet
-
-```
-State 1: <Initial predicate>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<>>, <<>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 4 @@ p2 :> 3 @@ p3 :> 4)
-
-State 2: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 5 @@ p2 :> 3 @@ p3 :> 4)
-
-State 3: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 3 @@ p3 :> 4)
-
-State 4: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<v3, v2>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 4 @@ p3 :> 4)
-
-State 5: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<v3, v2>>, <<v3, v2>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 5 @@ p3 :> 4)
-
-State 6: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<v3, v2>>, <<v3, v2>>, <<v5, v4>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<>>, <<>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 6 @@ p3 :> 4)
-
-State 7: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 1)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<v3, v2>>, <<v3, v2>>, <<v5, v4>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<v3, v2>>, <<>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 6 @@ p3 :> 5)
-
-State 8: <proc line 144, col 15 to line 150, col 70 of module Streamlet>
-/\ height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 1)
-/\ votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1, v5>>, <<v1, v3>>, <<v1, v3>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3, v2>>, <<v3, v2>>, <<v3, v2>>, <<v5, v4>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1, v5>>, <<v3, v2>>, <<v5, v4>>>> )
-/\ round = (p1 :> 6 @@ p2 :> 6 @@ p3 :> 6)
-
-
-```

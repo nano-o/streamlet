@@ -13,6 +13,7 @@ CONSTANTS
     ,   Quorum \* The set of quorums
     ,   MaxEpoch
     ,   MaxAsyncEpoch \* Epochs up to MaxAsyncEpoch are asynchronous, and later epochs are synchronous
+    \* TODO change to FirstSyncEpoch to make counting easier
 
 E == 1..MaxEpoch
 
@@ -78,22 +79,33 @@ Compatible(b1, b2) == b1 = b2 \/ Prefix(b1, b2) \/ Prefix(b2, b1)
         BaitInv1 == \A b \in Blocks : \neg Final(b)
         BaitInv2 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Final(b2) /\ \neg Compatible(b1, b2))
         \* Liveness property:
-        Liveness == (epoch = MaxAsyncEpoch+5) => \E b \in Blocks : Final(b)
+        Liveness == (epoch = MaxAsyncEpoch+6) => \E b \in Blocks : Final(b)
     }
     process (scheduler \in {"sched"})
         variables
-            n = 1; \* the next process to take a step
+            n = 1, \* the next process to take a step
+            proposal = <<>>; \* in a synchronous epoch, the proposal of the leader
     {
 l1:     while (TRUE) {
             when epoch \in E; \* stop if we ran out of epochs
-            with (proc = Proc(n))
+            if (n = 1 /\ epoch > MaxAsyncEpoch) { \* this is the beginning of the epoch, so pick a proposal
+                with (b \in Blocks) { \* first pick a block to extend
+                    when Notarized(b);
+                    \* after the first synchronous epoch, all processes pick the tip with the highest epoch:
+                    \* Liveness violation with this:
+                    \* when epoch > MaxAsyncEpoch+1 => Tip(b);
+                    when epoch > MaxAsyncEpoch+1 => Tip(b) /\ \A b2 \in Blocks : Tip(b2) => Epoch(b2) <= Epoch(b);
+                    with (tx \in Tx)
+                        proposal := Append(b, <<epoch,tx>>)
+                }
+            };
+            with (proc = Proc(n)) \* process number n takes a step
             either { \* proc extends a longer notarized chain with a vote
                 with (b \in Blocks) { \* the notarized block we're going to extend
                     when Len(b) >= height[proc] /\ Notarized(b) /\ Epoch(b) < epoch;
-                    when epoch > MaxAsyncEpoch+1 => b = CHOOSE b0 \in BlocksBefore(epoch) : TipBefore(epoch,b0); \* after the first synchronous epoch, all processes pick the same block and it's a tip
-                    with (tx \in Tx) { \* pick a payload
-                        when epoch > MaxAsyncEpoch+1 => tx = CHOOSE tx0 \in Tx : TRUE; \* after the first synchronous epoch, all processes pick the same payload
-                        votes[proc] := @ \cup {Append(b, <<epoch, tx>>)};
+                    with (tx \in Tx, newB = Append(b, <<epoch, tx>>)) { \* pick a payload to form the new block
+                        when epoch > MaxAsyncEpoch => newB = proposal; \* in a synchronous epoch, vote for the proposal
+                        votes[proc] := @ \cup {newB};
                     };
                     height[proc] := Len(b);
                 }
@@ -110,7 +122,7 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "31386c48" /\ chksum(tla) = "87cd6a27")
+\* BEGIN TRANSLATION (chksum(pcal) = "b518c581" /\ chksum(tla) = "57fbf933")
 VARIABLES height, votes, epoch
 
 (* define statement *)
@@ -135,11 +147,11 @@ Inv1 == \A b1,b2 \in Blocks : Competing(b1) /\ Competing(b2) => Abs(Len(b1) - Le
 BaitInv1 == \A b \in Blocks : \neg Final(b)
 BaitInv2 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Final(b2) /\ \neg Compatible(b1, b2))
 
-Liveness == (epoch = MaxAsyncEpoch+5) => \E b \in Blocks : Final(b)
+Liveness == (epoch = MaxAsyncEpoch+6) => \E b \in Blocks : Final(b)
 
-VARIABLE n
+VARIABLES n, proposal
 
-vars == << height, votes, epoch, n >>
+vars == << height, votes, epoch, n, proposal >>
 
 ProcSet == ({"sched"})
 
@@ -149,15 +161,24 @@ Init == (* Global variables *)
         /\ epoch = 1
         (* Process scheduler *)
         /\ n = [self \in {"sched"} |-> 1]
+        /\ proposal = [self \in {"sched"} |-> <<>>]
 
 scheduler(self) == /\ epoch \in E
+                   /\ IF n[self] = 1 /\ epoch > MaxAsyncEpoch
+                         THEN /\ \E b \in Blocks:
+                                   /\ Notarized(b)
+                                   /\ epoch > MaxAsyncEpoch+1 => Tip(b) /\ \A b2 \in Blocks : Tip(b2) => Epoch(b2) <= Epoch(b)
+                                   /\ \E tx \in Tx:
+                                        proposal' = [proposal EXCEPT ![self] = Append(b, <<epoch,tx>>)]
+                         ELSE /\ TRUE
+                              /\ UNCHANGED proposal
                    /\ LET proc == Proc(n[self]) IN
                         \/ /\ \E b \in Blocks:
                                 /\ Len(b) >= height[proc] /\ Notarized(b) /\ Epoch(b) < epoch
-                                /\ epoch > MaxAsyncEpoch+1 => b = CHOOSE b0 \in BlocksBefore(epoch) : TipBefore(epoch,b0)
                                 /\ \E tx \in Tx:
-                                     /\ epoch > MaxAsyncEpoch+1 => tx = CHOOSE tx0 \in Tx : TRUE
-                                     /\ votes' = [votes EXCEPT ![proc] = @ \cup {Append(b, <<epoch, tx>>)}]
+                                     LET newB == Append(b, <<epoch, tx>>) IN
+                                       /\ epoch > MaxAsyncEpoch => newB = proposal'[self]
+                                       /\ votes' = [votes EXCEPT ![proc] = @ \cup {newB}]
                                 /\ height' = [height EXCEPT ![proc] = Len(b)]
                         \/ /\ epoch <= MaxAsyncEpoch
                            /\ TRUE
@@ -176,5 +197,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Fri Dec 24 15:56:27 PST 2021 by nano
+\* Last modified Fri Dec 24 16:28:01 PST 2021 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

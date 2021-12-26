@@ -50,6 +50,14 @@ Num == \* assigns a process number to each process
 Proc(n) == \* the inverse of Num
     CHOOSE p \in P : Num[p] = n   
 
+(***************************************************************************)
+(* TODO how to check with TLC that steps of different rounds really        *)
+(* commute? Do they really commute? It seems that the "pick a fresh        *)
+(* vertice" requirement means they don't commute.  However, morally they   *)
+(* still do: as values are uninterpreted, it doesn't rally matter which    *)
+(* one is picked.                                                          *)
+(***************************************************************************)
+
 (* 
 --algorithm Streamlet {
     variables
@@ -79,6 +87,7 @@ Proc(n) == \* the inverse of Num
         \* Main safety property:
         Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
         BaitInv1 == \A v \in V : \neg Decided(v)
+        BaitInv2 == \neg (\E v,w \in V : Notarized(1,v) /\ Notarized(3,w) /\ Decided(w) /\ \neg Compatible(v, w, G))
     }
     process (scheduler \in {"sched"})
         variables
@@ -90,10 +99,12 @@ l1:     while (TRUE) {
             with (proc = Proc(n))
             either { \* proc extends a longer notarized chain with a vote
                 with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
+                    \* when Cardinality(Children({v},G)) <= 1; \* limit the fanout to speed up model-checking
                     when Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
-                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) \* pick a fresh vertice or vote for an existing child of v
+                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
                         \* note that, in the original algorithm, blocks are unique due to hash chaining
                         votes[proc][round] := <<v,w>>;
+                    };
                     height[proc] := Height(v);
                 }
             } 
@@ -108,7 +119,7 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "9c6ee374" /\ chksum(tla) = "22af30a3")
+\* BEGIN TRANSLATION (chksum(pcal) = "dfd51730" /\ chksum(tla) = "58ceabb")
 VARIABLES height, votes
 
 (* define statement *)
@@ -135,6 +146,7 @@ Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
 
 Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
 BaitInv1 == \A v \in V : \neg Decided(v)
+BaitInv2 == \neg (\E v,w \in V : Notarized(1,v) /\ Notarized(3,w) /\ Decided(w) /\ \neg Compatible(v, w, G))
 
 VARIABLES round, n
 
@@ -171,5 +183,5 @@ Spec == Init /\ [][Next]_vars
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Wed Dec 22 20:21:55 PST 2021 by nano
+\* Last modified Thu Dec 23 09:06:27 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

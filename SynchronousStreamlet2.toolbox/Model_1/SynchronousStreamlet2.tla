@@ -28,8 +28,8 @@ RECURSIVE Reachable(_,_,_)
 Reachable(v1, v2, G) == \* v2 is reachable from v1 
 \* CAUTION: does not terminate if there is a cycle reachable from v1
     \/  v1 = v2
-    \/  <<v1,v2>> \in G
-    \/  \E v3 \in Children({v1}, G) : Reachable(v3, v2, G)
+    \/  v1 # v2 /\ <<v1,v2>> \in G
+    \/  \E v3 \in Children({v1}, G) : v1 # v3 /\ Reachable(v3, v2, G)
         
 Compatible(v, w, G) == Reachable(v, w, G) \/ Reachable(w, v, G)
 
@@ -38,9 +38,9 @@ Distance(W, v, G) == \* W is a set of vertices
     CASE
         v \in W -> 0
     []  v \in Children(W,G) -> 1
-    []  OTHER -> 1 + Distance(Children(W,G), v, G)
+    []  OTHER -> 1 + Distance(Children(W,G)\W, v, G)
 
-Root == <<>>
+Root == <<0, CHOOSE tx \in Tx : TRUE>>
 
 Max(X) == CHOOSE x \in X : \A y \in X : y <= x
 Abs(n) == IF n < 0 THEN -n ELSE n
@@ -57,12 +57,16 @@ Proc(n) == \* the inverse of Num
         height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
         votes = [p \in P |-> {}], \* the votes cast by the processes
     define {
+        \* A block consists of a parent block (identified by its epoch and payload), an epoch, and a payload:
         IsBlock(b) == 
-            /\  b = <<b[1],<<b[2][1], b[2][2]>>>>
+            LET parent == b[1]
+                epoch == b[2][1]
+                payload == b[2][2]
+                parentEpoch == parent[1]
+                parentPayload == parent[2]
+            IN b = <<parent, <<epoch, payload>>>> /\ parent = <<parentEpoch, parentPayload>>
         Epoch(b) == IF b = Root THEN 0 ELSE b[2][1] \* the epoch of a block
-        Prev(b) == b[1]
-        Payload(b) == b[2][2]
-        \* the digraph formed by all the votes
+        \* the digraph formed by all the blocks ever voted:
         G == UNION {votes[p] : p \in P}
         Notarized(b) == b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
         Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
@@ -93,13 +97,13 @@ l1:     while (TRUE) {
             when epoch \in E; \* stop if we ran out of epochs
             with (proc = Proc(n))
             either { \* proc extends a longer notarized chain with a vote
-                with (b \in Vertices(G) \cup {Root}) { \* the notarized block we're going to extend
-                    when Height(b) >= height[proc] /\ Notarized(b) /\ Epoch(b) < epoch;
-                    when Cardinality(Children({b},G)) <= 1; \* limit the fanout to speed up model-checking
+                with (b \in G \cup {<<Root,Root>>}) { \* the notarized block we're going to extend
+                    \* when Height(b) >= height[proc] /\ Notarized(b) /\ Epoch(b) < epoch;
+                    when Cardinality(Children({b[2]},G)) <= 1; \* limit the fanout to speed up model-checking
                     with (tx \in Tx) { \* pick a payload
-                        votes[proc] := <<b,<<epoch,tx>>>>;
+                        votes[proc] := @ \cup {<<b[2],<<epoch,tx>>>>};
                     };
-                    height[proc] := Height(b);
+                    \* height[proc] := Height(b);
                 }
             } 
             or { \* proc skips the epoch
@@ -113,15 +117,18 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "8e851cf" /\ chksum(tla) = "5fb7ea9d")
+\* BEGIN TRANSLATION (chksum(pcal) = "e100ac51" /\ chksum(tla) = "4e0cf28d")
 VARIABLES height, votes
 
 (* define statement *)
 IsBlock(b) ==
-    /\  b = <<b[1],<<b[2][1], b[2][2]>>>>
+    LET parent == b[1]
+        epoch == b[2][1]
+        payload == b[2][2]
+        parentEpoch == parent[1]
+        parentPayload == parent[2]
+    IN b = <<parent, <<epoch, payload>>>> /\ parent = <<parentEpoch, parentPayload>>
 Epoch(b) == IF b = Root THEN 0 ELSE b[2][1]
-Prev(b) == b[1]
-Payload(b) == b[2][2]
 
 G == UNION {votes[p] : p \in P}
 Notarized(b) == b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
@@ -159,19 +166,18 @@ Init == (* Global variables *)
 
 scheduler(self) == /\ epoch[self] \in E
                    /\ LET proc == Proc(n[self]) IN
-                        \/ /\ \E b \in Vertices(G) \cup {Root}:
-                                /\ Height(b) >= height[proc] /\ Notarized(b) /\ Epoch(b) < epoch[self]
-                                /\ Cardinality(Children({b},G)) <= 1
+                        \/ /\ \E b \in G \cup {<<Root,Root>>}:
+                                /\ Cardinality(Children({b[2]},G)) <= 1
                                 /\ \E tx \in Tx:
-                                     votes' = [votes EXCEPT ![proc] = <<b,<<epoch[self],tx>>>>]
-                                /\ height' = [height EXCEPT ![proc] = Height(b)]
+                                     votes' = [votes EXCEPT ![proc] = @ \cup {<<b[2],<<epoch[self],tx>>>>}]
                         \/ /\ TRUE
-                           /\ UNCHANGED <<height, votes>>
+                           /\ votes' = votes
                    /\ n' = [n EXCEPT ![self] = (n[self]%Cardinality(P)) + 1]
                    /\ IF n'[self] = 1
                          THEN /\ epoch' = [epoch EXCEPT ![self] = epoch[self] + 1]
                          ELSE /\ TRUE
                               /\ epoch' = epoch
+                   /\ UNCHANGED height
 
 Next == (\E self \in {"sched"}: scheduler(self))
 
@@ -182,5 +188,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Thu Dec 23 15:38:19 PST 2021 by nano
+\* Last modified Thu Dec 23 16:18:52 PST 2021 by nano
 \* Created Thu Dec 23 15:19:12 PST 2021 by nano

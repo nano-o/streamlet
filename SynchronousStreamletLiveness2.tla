@@ -40,14 +40,6 @@ Epoch(b) == IF b = Root THEN 0 ELSE b[Len(b)][1]
 Payload(b) == b[Len(b)][2]
 Parent(b) == SubSeq(b, 1, Len(b)-1)
 
-\* A set of blocks corresponds to a digraph:
-DiGraph(Blocks) == LET Edges(b) == 
-        CASE 
-            Len(b) > 1 -> {<<b[i],b[i+1]>> : i \in 1..(Len(b)-1)} \cup {<<<<0>>, b[1]>>}
-        []  Len(b) = 1 -> {<<<<0>>, b[1]>>}
-        []  b = <<>> -> {}
-    IN  UNION {Edges(b) : b \in {b \in Blocks : b # <<>>}}
-
 Prefix(b1, b2) == Len(b1) < Len(b2) /\ b1 = SubSeq(b2, 1, Len(b1)) \* strict prefix
 Compatible(b1, b2) == b1 = b2 \/ Prefix(b1, b2) \/ Prefix(b2, b1)
 
@@ -201,5 +193,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Sun Dec 26 13:34:22 PST 2021 by nano
+\* Last modified Sun Dec 26 14:41:38 PST 2021 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

@@ -81,14 +81,14 @@ Proc(n) == \* the inverse of Num
         \* The heights of two competing tips differ at most by 1:   
         Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
         \* Decided vertices:
-        Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
+        Decided(v) == \E v1,v3 \in Vertices(G) : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
             /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
             /\  <<v1,v>> \in G /\ <<v,v3>> \in G 
         \* Main safety property:
         Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
-        BaitInv1 == \A v \in V : \neg Decided(v)
-        BaitInv2 == \neg (\E v1,v2,v3 \in V : Notarized(1,v1) /\ Notarized(2,v2) /\ v2 \in Children({Root},G) /\ Notarized(3,v3) /\ \neg Compatible(v2, v3, G))
+        BaitInv1 == \A v \in Vertices(G) : \neg Decided(v)
+        BaitInv2 == \neg (\E v1,v2,v3 \in Vertices(G) : Notarized(1,v1) /\ Notarized(2,v2) /\ v2 \in Children({Root},G) /\ Notarized(3,v3) /\ \neg Compatible(v2, v3, G))
         \* Liveness
         MaxASyncRound == 1 \* the asynchronous rounds
         Liveness == (round = MaxASyncRound+5) => \E v \in Vertices(G) : Decided(v)
@@ -103,8 +103,10 @@ l1:     while (TRUE) {
             if (n = 1 /\ round > MaxASyncRound) { \* start of a good round, so pick the proposal
                 with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
                     when round > MaxASyncRound+1 => Tip(v); \* received all messages so we know the tip
-                    with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G))\* pick a fresh vertice or an existing child of v
-                        proposal := <<v,w>>;
+                    with (val \in V) {
+                        when \neg <<round, val>> \in Vertices(G) \/ <<round,val>> \in Children({v}, G);
+                        proposal := <<v,<<val,round>>>>;
+                    }
                 }
             };
             
@@ -115,8 +117,10 @@ l1:     while (TRUE) {
                     \* when Cardinality(Children({v},G)) <= 1; \* limit the fanout to speed up model-checking
                     when Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
                         \* TODO problem here, what is the child is from a previous epoch? SOLUTION: add epoch to the value. And maybe we recover commutativity.
-                        with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) \* pick a fresh vertice or an existing child of v. 
-                        votes[proc][round] := <<v,w>>;
+                    with (val \in V) {
+                        when \neg <<round, val>> \in Vertices(G) \/ <<round,val>> \in Children({v}, G);  
+                        votes[proc][round] := <<v,<<round,val>>>>;
+                    };
                     height[proc] := Height(v);
                 }
             }   
@@ -139,7 +143,7 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "cb9d3fa2" /\ chksum(tla) = "8aa03ee3")
+\* BEGIN TRANSLATION (chksum(pcal) = "75dc1add" /\ chksum(tla) = "c88777c0")
 VARIABLES height, votes, round
 
 (* define statement *)
@@ -159,14 +163,14 @@ Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
 
 Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
 
-Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
+Decided(v) == \E v1,v3 \in Vertices(G) : \E r \in Round \cup {0}:
     /\  r+2 <= Max(Round)
     /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
     /\  <<v1,v>> \in G /\ <<v,v3>> \in G
 
 Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
-BaitInv1 == \A v \in V : \neg Decided(v)
-BaitInv2 == \neg (\E v1,v2,v3 \in V : Notarized(1,v1) /\ Notarized(2,v2) /\ v2 \in Children({Root},G) /\ Notarized(3,v3) /\ \neg Compatible(v2, v3, G))
+BaitInv1 == \A v \in Vertices(G) : \neg Decided(v)
+BaitInv2 == \neg (\E v1,v2,v3 \in Vertices(G) : Notarized(1,v1) /\ Notarized(2,v2) /\ v2 \in Children({Root},G) /\ Notarized(3,v3) /\ \neg Compatible(v2, v3, G))
 
 MaxASyncRound == 1
 Liveness == (round = MaxASyncRound+5) => \E v \in Vertices(G) : Decided(v)
@@ -189,16 +193,18 @@ scheduler(self) == /\ round \in Round
                    /\ IF n[self] = 1 /\ round > MaxASyncRound
                          THEN /\ \E v \in Vertices(G) \cup {Root}:
                                    /\ round > MaxASyncRound+1 => Tip(v)
-                                   /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
-                                        proposal' = [proposal EXCEPT ![self] = <<v,w>>]
+                                   /\ \E val \in V:
+                                        /\ \neg <<round, val>> \in Vertices(G) \/ <<round,val>> \in Children({v}, G)
+                                        /\ proposal' = [proposal EXCEPT ![self] = <<v,<<val,round>>>>]
                          ELSE /\ TRUE
                               /\ UNCHANGED proposal
                    /\ LET proc == Proc(n[self]) IN
                         \/ /\ round <= MaxASyncRound
                            /\ \E v \in Vertices(G) \cup {Root}:
                                 /\ Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v)
-                                /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
-                                     votes' = [votes EXCEPT ![proc][round] = <<v,w>>]
+                                /\ \E val \in V:
+                                     /\ \neg <<round, val>> \in Vertices(G) \/ <<round,val>> \in Children({v}, G)
+                                     /\ votes' = [votes EXCEPT ![proc][round] = <<v,<<round,val>>>>]
                                 /\ height' = [height EXCEPT ![proc] = Height(v)]
                         \/ /\ round > MaxASyncRound
                            /\ Height(proposal'[self][1]) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,proposal'[self][1])
@@ -221,5 +227,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Thu Dec 23 17:50:32 PST 2021 by nano
+\* Last modified Fri Dec 24 11:51:04 PST 2021 by nano
 \* Created Thu Dec 23 16:22:06 PST 2021 by nano

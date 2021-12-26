@@ -18,9 +18,9 @@ CONSTANTS
 (* a set of edges.                                                         *)
 (***************************************************************************)
 
-Vertices(G) == {v \in V : \E w \in V : <<v,w>> \in G \/ <<w,v>> \in G}
+IsDigraph(G) == \A e \in G : e = <<e[1], e[2]>>  
 
-IsDigraph(G) == \A e \in G : e[1] \in Vertices(G) /\ e[2] \in Vertices(G) 
+Vertices(G) == {e[1] : e \in G} \union {e[2] : e \in G}
     
 Children(W, G) == UNION {{w \in Vertices(G) : <<v,w>> \in G} : v \in W} 
             
@@ -62,9 +62,9 @@ Proc(n) == \* the inverse of Num
 --algorithm Streamlet {
     variables
         height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
-        votes = [p \in P |-> [r \in Round |-> <<>>]], \* the votes cast by the processes
+        votes = [p \in P |-> {}], \* the votes cast by the processes
     define {
-        G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
+        G == {votes[p] : p \in P}
         Notarized(r,v) == 
             IF r = 0
             THEN v = Root
@@ -119,11 +119,11 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "dfd51730" /\ chksum(tla) = "58ceabb")
+\* BEGIN TRANSLATION (chksum(pcal) = "b8e4a10a" /\ chksum(tla) = "ed286d51")
 VARIABLES height, votes
 
 (* define statement *)
-G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
+G == {votes[p] : p \in P}
 Notarized(r,v) ==
     IF r = 0
     THEN v = Root
@@ -156,7 +156,7 @@ ProcSet == ({"sched"})
 
 Init == (* Global variables *)
         /\ height = [p \in P |-> 0]
-        /\ votes = [p \in P |-> [r \in Round |-> <<>>]]
+        /\ votes = [p \in P |-> {}]
         (* Process scheduler *)
         /\ round = [self \in {"sched"} |-> 1]
         /\ n = [self \in {"sched"} |-> 1]
@@ -184,5 +184,5 @@ Spec == Init /\ [][Next]_vars
 
 =============================================================================
 \* Modification History
-\* Last modified Thu Dec 23 10:52:32 PST 2021 by nano
+\* Last modified Fri Dec 24 14:44:26 PST 2021 by nano
 \* Created Thu Dec 23 10:52:10 PST 2021 by nano

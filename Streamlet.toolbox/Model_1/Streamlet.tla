@@ -8,10 +8,10 @@
 EXTENDS Integers, TLC, FiniteSets
 
 CONSTANTS
-        P \* The set of processors
+        P \* The set of processes
     ,   V \* The set of values
     ,   Quorum \* The set of quorums
-    ,   Round \* The set of rounds. Should be of the form 1..N
+    ,   Round \* The set of rounds. Should be of the form 1..N       
 
 (***************************************************************************)
 (* First we need a few notions about directed graphs.  A directed graph is *)
@@ -38,18 +38,25 @@ Distance(W, v, G) == \* W is a set of vertices
         v \in W -> 0
     []  v \in Children(W,G) -> 1
     []  OTHER -> 1 + Distance(Children(W,G), v, G)
-    
- 
-(***************************************************************************)
-(* Now we're ready for the algorithm.                                      *)
-(*                                                                         *)
-(* We want to show that the height of two competing tips differ at most by *)
-(* 1.                                                                      *)
-(***************************************************************************)
 
 Root == CHOOSE v \in V : TRUE
 
 Max(E) == CHOOSE e \in E : \A f \in E : f <= e
+Abs(n) == IF n < 0 THEN -n ELSE n
+    
+Num == \* assigns a process number to each process
+    CHOOSE f \in [P -> 1..Cardinality(P)] : 
+        \A p1,p2 \in P : p1 # p2 => f[p1] # f[p2]
+Proc(n) == \* the inverse of Num
+    CHOOSE p \in P : Num[p] = n   
+
+(***************************************************************************)
+(* TODO how to check with TLC that steps of different rounds really        *)
+(* commute? Do they really commute? It seems that the "pick a fresh        *)
+(* vertice" requirement means they don't commute.  However, morally they   *)
+(* still do: as values are uninterpreted, it doesn't rally matter which    *)
+(* one is picked.                                                          *)
+(***************************************************************************)
 
 (* 
 --algorithm Streamlet {
@@ -59,102 +66,122 @@ Max(E) == CHOOSE e \in E : \A f \in E : f <= e
     define {
         G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
         Notarized(r,v) == 
-            \/  (r = 0 /\ v = Root) 
-            \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>   
+            IF r = 0
+            THEN v = Root
+            ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
         Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
-        (*******************************************************************)
-        (* By Inv1, we know that if a tip is more than on behind, it can   *)
-        (* never be built on anymore.  So we can decide when we detect     *)
-        (* that all competing tips must be more than one behind.  This is  *)
-        (* when two vertices are notarized in a row.                       *)
-        (*******************************************************************)
+        \* The tip of a notarized chain:
+        Tip(v) == 
+            /\  v \in Vertices(G)
+            /\  \E r \in Round : Notarized(r,v)
+            /\  \A w \in Vertices(G) : \E r \in Round : Notarized(r,w) /\ v # w => \neg Reachable(v, w, G)
+        \* A tip is still competing if a quorum has a lower or equal notarized height:
+        Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
+        \* The heights of two competing tips differ at most by 1:   
+        Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
         \* Decided vertices:
         Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}: 
             /\  r+2 <= Max(Round)
             /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
-            /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G) 
+            /\  <<v1,v>> \in G /\ <<v,v3>> \in G 
         \* Main safety property:
         Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
         BaitInv1 == \A v \in V : \neg Decided(v)
+        BaitInv2 == \neg (\E v,w \in V : Notarized(1,v) /\ Notarized(3,w) /\ Decided(w) /\ \neg Compatible(v, w, G))
     }
-    process (proc \in P)
-        variables 
-            round = 1, \* current round
+    process (scheduler \in {"sched"})
+        variables
+            round = 1, \* the current round
+            n = 1; \* the next process to take a step
     {
-l1:     while (TRUE) { \* extend a longer notarized chain with a vote and go to the next round
-            when round \in Round; \* for TLC            
+l1:     while (TRUE) {
+            when round \in Round; \* stop if we ran out of rounds
+            with (proc = Proc(n))
+            either { \* proc extends a longer notarized chain with a vote
                 with (v \in Vertices(G) \cup {Root}) { \* the notarized vertice we're going to extend
-                    when Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
+                    \* when Cardinality(Children({v},G)) <= 1; \* limit the fanout to speed up model-checking
+                    when Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round /\ Notarized(r,v);
                     with (w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G)) { \* pick a fresh vertice or vote for an existing child of v
-                        votes[self][round] := <<v,w>>;
+                        \* note that, in the original algorithm, blocks are unique due to hash chaining
+                        votes[proc][round] := <<v,w>>;
                     };
-                    height[self] := Height(v);
-                    round := round +1;
+                    height[proc] := Height(v);
                 }
+            } 
+            or { \* proc skips the round
+                skip
+            };
+            n := (n%Cardinality(P)) + 1;
+            if (n = 1) { \* we scheduled all processes
+                round := round + 1; \* go to the next round
             }
         }
     }
 }
-(*
-MyInit == 
-/\  height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\  round = (p1 :> 4 @@ p2 :> 3 @@ p3 :> 4)
-/\  votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1,v5>>, <<>>, <<>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3,v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1,v5>>, <<>>, <<>>>> )
 *)
-
-*)
-\* BEGIN TRANSLATION (chksum(pcal) = "13aaa2b2" /\ chksum(tla) = "372eae52")
+\* BEGIN TRANSLATION (chksum(pcal) = "dfd51730" /\ chksum(tla) = "58ceabb")
 VARIABLES height, votes
 
 (* define statement *)
 G == {votes[p][r] : p \in P, r \in Round} \ {<<>>}
 Notarized(r,v) ==
-    \/  (r = 0 /\ v = Root)
-    \/  \E Q \in Quorum, r0 \in Round, w \in Vertices(G) : \A p \in Q : votes[p][r0] = <<w,v>>
+    IF r = 0
+    THEN v = Root
+    ELSE \E Q \in Quorum, w \in Vertices(G) : \A p \in Q : votes[p][r] = <<w,v>>
 Height(v) == IF v = Root THEN 0 ELSE Distance({Root}, v, G)
 
+Tip(v) ==
+    /\  v \in Vertices(G)
+    /\  \E r \in Round : Notarized(r,v)
+    /\  \A w \in Vertices(G) : \E r \in Round : Notarized(r,w) /\ v # w => \neg Reachable(v, w, G)
 
+Competing(v) == Tip(v) /\ \E Q \in Quorum : \A p \in Q : height[p] <= Height(v)
 
-
-
-
+Inv1 == \A v,w \in Vertices(G) : Competing(v) /\ Competing(w) => Abs(Height(v) - Height(w)) <= 1
 
 Decided(v) == \E v1,v3 \in V : \E r \in Round \cup {0}:
     /\  r+2 <= Max(Round)
     /\  Notarized(r,v1) /\  Notarized(r+1,v) /\  Notarized(r+2,v3)
-    /\  v \in Children({v1}, G) /\ v3 \in Children({v}, G)
+    /\  <<v1,v>> \in G /\ <<v,v3>> \in G
 
 Safety == \A v,w \in Vertices(G) : Decided(v) /\ Decided(w) => Compatible(w, v, G)
 BaitInv1 == \A v \in V : \neg Decided(v)
+BaitInv2 == \neg (\E v,w \in V : Notarized(1,v) /\ Notarized(3,w) /\ Decided(w) /\ \neg Compatible(v, w, G))
 
-VARIABLE round
+VARIABLES round, n
 
-vars == << height, votes, round >>
+vars == << height, votes, round, n >>
 
-ProcSet == (P)
+ProcSet == ({"sched"})
 
 Init == (* Global variables *)
         /\ height = [p \in P |-> 0]
         /\ votes = [p \in P |-> [r \in Round |-> <<>>]]
-        (* Process proc *)
-        /\ round = [self \in P |-> 1]
+        (* Process scheduler *)
+        /\ round = [self \in {"sched"} |-> 1]
+        /\ n = [self \in {"sched"} |-> 1]
 
-proc(self) == /\ round[self] \in Round
-              /\ \E v \in Vertices(G) \cup {Root}:
-                   /\ Height(v) >= height[self] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
-                   /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
-                        votes' = [votes EXCEPT ![self][round[self]] = <<v,w>>]
-                   /\ height' = [height EXCEPT ![self] = Height(v)]
-                   /\ round' = [round EXCEPT ![self] = round[self] +1]
+scheduler(self) == /\ round[self] \in Round
+                   /\ LET proc == Proc(n[self]) IN
+                        \/ /\ \E v \in Vertices(G) \cup {Root}:
+                                /\ Height(v) >= height[proc] /\ \E r \in Round\cup {0} : r < round[self] /\ Notarized(r,v)
+                                /\ \E w \in (V \ (Vertices(G)\cup {Root})) \cup Children({v}, G):
+                                     votes' = [votes EXCEPT ![proc][round[self]] = <<v,w>>]
+                                /\ height' = [height EXCEPT ![proc] = Height(v)]
+                        \/ /\ TRUE
+                           /\ UNCHANGED <<height, votes>>
+                   /\ n' = [n EXCEPT ![self] = (n[self]%Cardinality(P)) + 1]
+                   /\ IF n'[self] = 1
+                         THEN /\ round' = [round EXCEPT ![self] = round[self] + 1]
+                         ELSE /\ TRUE
+                              /\ round' = round
 
-Next == (\E self \in P: proc(self))
+Next == (\E self \in {"sched"}: scheduler(self))
 
 Spec == Init /\ [][Next]_vars
 
 \* END TRANSLATION 
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 20 09:30:53 PST 2021 by nano
+\* Last modified Thu Dec 23 09:06:27 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

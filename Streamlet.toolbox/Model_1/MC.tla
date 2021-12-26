@@ -8,46 +8,38 @@ p1, p2, p3
 
 \* MV CONSTANT declarations@modelParameterConstants
 CONSTANTS
-v1, v2, v3, v4, v5, v6
+v1, v2, v3, v4, v5
 ----
 
 \* MV CONSTANT definitions P
-const_1640022420505539000 == 
+const_16402792182241488000 == 
 {p1, p2, p3}
 ----
 
 \* MV CONSTANT definitions V
-const_1640022420505540000 == 
-{v1, v2, v3, v4, v5, v6}
+const_16402792182241489000 == 
+{v1, v2, v3, v4, v5}
 ----
 
 \* SYMMETRY definition
-symm_1640022420505541000 == 
-Permutations(const_1640022420505539000) \union Permutations(const_1640022420505540000)
+symm_16402792182241490000 == 
+Permutations(const_16402792182241488000) \union Permutations(const_16402792182241489000)
 ----
 
-\* New definitions @modelParameterNewDefinitions
-MyInit == 
-/\  height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 0)
-/\  round = (p1 :> 4 @@ p2 :> 3 @@ p3 :> 4)
-/\  votes = ( p1 :> <<<<v1, v3>>, <<>>, <<v1,v5>>, <<>>, <<>>>> @@
-  p2 :> <<<<v1, v3>>, <<v3,v2>>, <<>>, <<>>, <<>>>> @@
-  p3 :> <<<<>>, <<>>, <<v1,v5>>, <<>>, <<>>>> )
-----
 \* CONSTANT definitions @modelParameterConstants:2Round
-const_1640022420505542000 == 
-1..5
+const_16402792182241491000 == 
+1..4
 ----
 
 \* CONSTANT definitions @modelParameterConstants:3Quorum
-const_1640022420505543000 == 
+const_16402792182241492000 == 
 {Q\in SUBSET P: 2*Cardinality(Q)>Cardinality(P)}
 ----
 
 \* SPECIFICATION definition @modelBehaviorSpec:0
-spec_1640022420505544000 ==
-MyInit /\ [][Next]_vars
+spec_16402792182241493000 ==
+Init /\ [][Next]_vars
 ----
 =============================================================================
 \* Modification History
-\* Created Mon Dec 20 09:47:00 PST 2021 by nano
+\* Created Thu Dec 23 09:06:58 PST 2021 by nano

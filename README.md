@@ -1,5 +1,4 @@
-The Streamlet blockchain consensus algorithm is arguably one of the simplest such algorithms.
-
+The Streamlet blockchain-consensus algorithm is arguably one of the simplest blockchain-consensus algorithms.
 In [their presentation of the Streamlet algorithm](https://eprint.iacr.org/2020/088.pdf), Chan and Shi provide a convincing safety proof, which nevertheless left me wanting to understanding the algorithm on a more intuitive level.
 
 In this post, I offer a different take on the safety of the crash-stop version of the Streamlet algorithm.
@@ -11,31 +10,32 @@ Moreover, I illustrate my reasoning with TLA+ models, including claims that can 
 The goal of the Streamlet algorithm is to enable a fixed set of nodes in a message-passing network to iteratively construct a unique and ever-growing blockchain.
 Although many such algorithms existed before Streamlet, Streamlet is striking because of the simplicity of the rules that nodes must follow.
 
-Streamlet can tolerate malicious nodes, but, to simplify things, here we will consider only crash-stop failures.
-We assume that we have a fixed set of N nodes and that only a strict minority of the nodes may crash.
+Streamlet can tolerate malicious nodes, but, to simplify things, here we consider its crash-fault variant.
+Thus, we assume that we have a fixed set of N nodes that can fail by stopping, and that, in every execution, a strict majority of the nodes do not fail.
+As is customary, we refer to a strict majority as a quorum.
 
 The protocol evolves in consecutive epochs (1,2,3,...) during which nodes vote for blocks according to the rules below.
-A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); a special, unique genesis block that has epoch number 0.
-A set of blocks can be seen as a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`, and a set of blocks forms a blockchain when every block is reachable from the genesis block.
-Note that, with this definition, a blockchain may very well be a tree (i.e. it may contain forks).
+A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); moreover, a special, unique genesis block has epoch number 0.
+A set of blocks forms a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`.
+We say that a set of blocks forms a valid block tree when the directed graph formed by the blocks is a tree rooted at the genesis block.
+A valid blockchain (or simply a chain for short) is a valid block tree in which every node has at most one successor, i.e. in which there are not forks.
 
-Each epoch e has a unique, pre-determined leader (e.g. node (e mod N)+1), and nodes must follow the following rules:
-- The leader proposes a new block (with epoch number e) that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
+Each epoch e has a unique, pre-determined leader (e.g. node (e mod N)+1), and nodes in epoch e must follow the following rules:
+- The leader proposes a new block with epoch number e that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
 - Every node votes for the leader's proposal as long as the proposal extends one of the longest notarized chains that the node knows of.
-- A block is notarized when it has gathered votes from a strict majority of the nodes in the same epoch, and a chain is notarized when all its blocks (except the genesis block) are.
-- In any notarized chain including three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second is final.
+- A block is notarized when it has gathered votes from a quorum in the same epoch, and a chain is notarized when all its blocks (except the genesis block) are.
+- When a notarized chain includes three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second of those 3 blocks is considered final.
 
 TODO: describe an interesting execution.
 
 The algorithm guarantees that if two chains are final, then one is a prefix of the other.
-In other words, there is a unique, linear, fork-less longest final chain.
 This is the consistency property of the algorithm.
 
-The Streamlet algorithm also never gets stuck; moreover, under eventual synchrony, the finalized chain is guaranteed to keep growing.
+Moreover, after 4 synchronous epochs with no failures, Streamlet guarantees that one more block gets finalized.
 This is the liveness property of the algorithm.
 
-The main question we will now address is: why does the consistency property hold?
-Hopefully, we'll look at liveness in another post.
+Note that the original papers proves that we need 5 synchronous epochs with no failures to guarantee finalizing one more block, but I believe this is overly pessimistic in the case of crash-stop failures and that 4 epochs suffice. Moreover, we will see that evidence provided by the TLC model-checker supports my claim.
+
 
 # Intuition behind the safety property
 

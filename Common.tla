@@ -7,6 +7,7 @@ CONSTANTS
     ,   Tx \* Transtaction sets (the payload in a block)
     ,   MaxEpoch
     ,   Quorum \* The set of quorums
+    ,   GSE \* The first synchronous epoch
     
 E == 1..MaxEpoch
 
@@ -46,5 +47,5 @@ Abs(n) == IF n < 0 THEN -n ELSE n
 
 =============================================================================
 \* Modification History
-\* Last modified Sun Dec 26 14:53:16 PST 2021 by nano
+\* Last modified Mon Dec 27 15:18:50 PST 2021 by nano
 \* Created Sun Dec 26 14:45:25 PST 2021 by nano

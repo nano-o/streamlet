@@ -1,42 +1,6 @@
 ------------------- MODULE SynchronousStreamletLiveness2 -------------------
 
-EXTENDS Integers, TLC, FiniteSets, Sequences
-
-CONSTANTS
-        P \* The set of processes
-    ,   Tx \* Transtaction sets (the payload in a block)
-    ,   Quorum \* The set of quorums
-    ,   MaxEpoch
-    ,   GSE \* The first synchronous epoch; all epochs are synchronous after it.
-    \* TODO change to FirstSyncEpoch to make counting easier
-
-E == 1..MaxEpoch
-
-Root == <<>> \* the root of the block tree
-
-Max(X) == CHOOSE x \in X : \A y \in X : y <= x
-Min(X) == CHOOSE x \in X : \A y \in X : x <= y
-Abs(n) == IF n < 0 THEN -n ELSE n
-    
-Num == \* assigns a process number to each process
-    CHOOSE f \in [P -> 1..Cardinality(P)] : 
-        \A p1,p2 \in P : p1 # p2 => f[p1] # f[p2]
-Proc(n) == \* the inverse of Num
-    CHOOSE p \in P : Num[p] = n
-    
-\* A block is a sequence of pairs where each pair consists of an epoch and a tx set:
-IsBlock(b) == 
-    /\  DOMAIN b = 1..Len(b) 
-    /\  \A i \in DOMAIN b : 
-        /\  b[i] = <<b[i][1],b[i][2]>>
-        /\  b[i][1] \in E
-        /\  b[i][2] \in Tx
-Epoch(b) == IF b = Root THEN 0 ELSE b[Len(b)][1]
-Payload(b) == b[Len(b)][2]
-Parent(b) == SubSeq(b, 1, Len(b)-1)
-
-Prefix(b1, b2) == Len(b1) < Len(b2) /\ b1 = SubSeq(b2, 1, Len(b1)) \* strict prefix
-Compatible(b1, b2) == b1 = b2 \/ Prefix(b1, b2) \/ Prefix(b2, b1)
+EXTENDS Common
 
 (* 
 --algorithm Streamlet {
@@ -73,11 +37,10 @@ Compatible(b1, b2) == b1 = b2 \/ Prefix(b1, b2) \/ Prefix(b2, b1)
     }
     macro setProposal() {
         with (b \in Blocks) { \* first pick a block to extend
+            \* leader picks a notarized block:
             when Notarized(b);
-            \* after the first synchronous epoch, the leader picks one of the longest notarized blocks.
-            \* Otherwise, the leader can pick any notarized node.
-            \* when epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Len(b2) <= Len(b);
-            when epoch >= GSE+1 => Tip(b) /\ \A b2 \in Blocks : Notarized(b2) => Epoch(b2) <= Epoch(b);
+            \* after the first synchronous epoch, the leader the notarized block with the most recent epoch:
+            when epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Epoch(b2) <= Epoch(b);
             with (tx \in Tx)
                 proposal := Append(b, <<epoch,tx>>)
         }
@@ -87,14 +50,12 @@ Compatible(b1, b2) == b1 = b2 \/ Prefix(b1, b2) \/ Prefix(b2, b1)
             n := 1;
             epoch := epoch+1
         }
-        else {
+        else
             n := n+1
-        }
     }
     process (scheduler \in {"sched"})
     {
-l1:     while (TRUE) {
-            when epoch \in E; \* stop if we ran out of epochs
+l1:     while (epoch \in E) {
             if (n = 1 /\ epoch >= GSE) { \* we're starting a synchronous epoch; pick a proposal
                 setProposal()
             };
@@ -130,8 +91,8 @@ l1:     while (TRUE) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "7a280470" /\ chksum(tla) = "cd3aa591")
-VARIABLES height, votes, epoch, n, proposal
+\* BEGIN TRANSLATION (chksum(pcal) = "8939afe7" /\ chksum(tla) = "5be66fe1")
+VARIABLES height, votes, epoch, n, proposal, pc
 
 (* define statement *)
 Blocks == {<<>>} \cup UNION {votes[p] : p \in P}
@@ -159,7 +120,7 @@ BaitInv2 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Final(
 Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
 
 
-vars == << height, votes, epoch, n, proposal >>
+vars == << height, votes, epoch, n, proposal, pc >>
 
 ProcSet == ({"sched"})
 
@@ -169,41 +130,55 @@ Init == (* Global variables *)
         /\ epoch = 1
         /\ n = 1
         /\ proposal = <<>>
+        /\ pc = [self \in ProcSet |-> "l1"]
 
-scheduler(self) == /\ epoch \in E
-                   /\ IF n = 1 /\ epoch >= GSE
-                         THEN /\ \E b \in Blocks:
-                                   /\ Notarized(b)
-                                   /\ epoch >= GSE+1 => Tip(b) /\ \A b2 \in Blocks : Notarized(b2) => Epoch(b2) <= Epoch(b)
-                                   /\ \E tx \in Tx:
-                                        proposal' = Append(b, <<epoch,tx>>)
-                         ELSE /\ TRUE
-                              /\ UNCHANGED proposal
-                   /\ LET proc == Proc(n) IN
-                        \/ /\ epoch < GSE
-                           /\ \/ /\ \E b \in Blocks:
-                                      /\ Len(b) >= height[proc] /\ Notarized(b)
-                                      /\ \E tx \in Tx:
-                                           LET newB == Append(b, <<epoch, tx>>) IN
-                                             votes' = [votes EXCEPT ![proc] = @ \cup {newB}]
-                                      /\ height' = [height EXCEPT ![proc] = Len(b)]
-                              \/ /\ TRUE
-                                 /\ UNCHANGED <<height, votes>>
-                        \/ /\ epoch >= GSE
-                           /\ IF height[proc] <= Len(proposal')-1
-                                 THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
-                                      /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
-                                 ELSE /\ TRUE
-                                      /\ UNCHANGED << height, votes >>
-                   /\ IF n = Cardinality(P)
-                         THEN /\ n' = 1
-                              /\ epoch' = epoch+1
-                         ELSE /\ n' = n+1
-                              /\ epoch' = epoch
+l1(self) == /\ pc[self] = "l1"
+            /\ IF epoch \in E
+                  THEN /\ IF n = 1 /\ epoch >= GSE
+                             THEN /\ \E b \in Blocks:
+                                       /\ Notarized(b)
+                                       /\ epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Epoch(b2) <= Epoch(b)
+                                       /\ \E tx \in Tx:
+                                            proposal' = Append(b, <<epoch,tx>>)
+                             ELSE /\ TRUE
+                                  /\ UNCHANGED proposal
+                       /\ LET proc == Proc(n) IN
+                            \/ /\ epoch < GSE
+                               /\ \/ /\ \E b \in Blocks:
+                                          /\ Len(b) >= height[proc] /\ Notarized(b)
+                                          /\ \E tx \in Tx:
+                                               LET newB == Append(b, <<epoch, tx>>) IN
+                                                 votes' = [votes EXCEPT ![proc] = @ \cup {newB}]
+                                          /\ height' = [height EXCEPT ![proc] = Len(b)]
+                                  \/ /\ TRUE
+                                     /\ UNCHANGED <<height, votes>>
+                            \/ /\ epoch >= GSE
+                               /\ IF height[proc] <= Len(proposal')-1
+                                     THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
+                                          /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
+                                     ELSE /\ TRUE
+                                          /\ UNCHANGED << height, votes >>
+                       /\ IF n = Cardinality(P)
+                             THEN /\ n' = 1
+                                  /\ epoch' = epoch+1
+                             ELSE /\ n' = n+1
+                                  /\ epoch' = epoch
+                       /\ pc' = [pc EXCEPT ![self] = "l1"]
+                  ELSE /\ pc' = [pc EXCEPT ![self] = "Done"]
+                       /\ UNCHANGED << height, votes, epoch, n, proposal >>
+
+scheduler(self) == l1(self)
+
+(* Allow infinite stuttering to prevent deadlock on termination. *)
+Terminating == /\ \A self \in ProcSet: pc[self] = "Done"
+               /\ UNCHANGED vars
 
 Next == (\E self \in {"sched"}: scheduler(self))
+           \/ Terminating
 
 Spec == Init /\ [][Next]_vars
+
+Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION 
 
@@ -222,5 +197,5 @@ State1 ==
 *)
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 27 13:17:24 PST 2021 by nano
+\* Last modified Mon Dec 27 15:18:47 PST 2021 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

@@ -12,34 +12,39 @@ Tx1, Tx2
 ----
 
 \* MV CONSTANT definitions P
-const_164055967818276000 == 
+const_16406475080911384000 == 
 {p1, p2, p3}
 ----
 
 \* MV CONSTANT definitions Tx
-const_164055967818277000 == 
+const_16406475080911385000 == 
 {Tx1, Tx2}
 ----
 
 \* SYMMETRY definition
-symm_164055967818278000 == 
-Permutations(const_164055967818276000) \union Permutations(const_164055967818277000)
+symm_16406475080911386000 == 
+Permutations(const_16406475080911384000) \union Permutations(const_16406475080911385000)
 ----
 
 \* CONSTANT definitions @modelParameterConstants:1Quorum
-const_164055967818279000 == 
+const_16406475080911387000 == 
 {{p1,p2},{p2,p3}}
 ----
 
 \* CONSTANT definitions @modelParameterConstants:3MaxEpoch
-const_164055967818280000 == 
+const_16406475080911388000 == 
 4
 ----
 
+\* CONSTANT definitions @modelParameterConstants:4GSE
+const_16406475080911389000 == 
+3
+----
+
 \* SPECIFICATION definition @modelBehaviorSpec:0
-spec_164055967818381000 ==
+spec_16406475080911390000 ==
 Init /\ [][Next]_vars
 ----
 =============================================================================
 \* Modification History
-\* Created Sun Dec 26 15:01:18 PST 2021 by nano
+\* Created Mon Dec 27 15:25:08 PST 2021 by nano

@@ -12,7 +12,7 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value=""/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="17"/>
+    <intAttribute key="fpIndex" value="66"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
     <intAttribute key="maxHeapSize" value="20"/>
     <intAttribute key="maxSetSize" value="1000000"/>
@@ -21,16 +21,16 @@
     <stringAttribute key="modelBehaviorNext" value=""/>
     <stringAttribute key="modelBehaviorSpec" value="Init /\ [][Next]_vars"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
-    <stringAttribute key="modelBehaviorVars" value="epoch, height, votes"/>
+    <stringAttribute key="modelBehaviorVars" value="epoch, pc, height, votes"/>
     <stringAttribute key="modelComments" value=""/>
-    <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
+    <booleanAttribute key="modelCorrectnessCheckDeadlock" value="true"/>
     <listAttribute key="modelCorrectnessInvariants">
-        <listEntry value="0Safety"/>
+        <listEntry value="1Safety"/>
         <listEntry value="0BaitInv1"/>
         <listEntry value="0~MyInit"/>
         <listEntry value="0\neg (&#10;/\  height = (p1 :&gt; 0 @@ p2 :&gt; 1 @@ p3 :&gt; 0)&#10;/\  round = (p1 :&gt; 4 @@ p2 :&gt; 3 @@ p3 :&gt; 4)&#10;/\  votes = ( p1 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;,&lt;&lt;&gt;&gt; &gt;&gt; @@ p2 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;v3,v2&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; @@ p3 :&gt; &lt;&lt;&lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; )&#10;)"/>
         <listEntry value="0\neg (&#10;    /\  height = (p1 :&gt; 0 @@ p2 :&gt; 1 @@ p3 :&gt; 0)&#10;    /\  votes = ( p1 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; @@&#10;      p2 :&gt; &lt;&lt;&lt;&lt;v1, v3&gt;&gt;, &lt;&lt;v3,v2&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; @@&#10;      p3 :&gt; &lt;&lt;&lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;v1,v5&gt;&gt;, &lt;&lt;&gt;&gt;, &lt;&lt;&gt;&gt;&gt;&gt; ))"/>
-        <listEntry value="1Inv1"/>
+        <listEntry value="0Inv1"/>
         <listEntry value="0BaitInv2"/>
         <listEntry value="0BaitInv3"/>
     </listAttribute>
@@ -43,6 +43,7 @@
         <listEntry value="Quorum;;{{p1,p2},{p2,p3}};0;0"/>
         <listEntry value="Tx;;{Tx1, Tx2};1;1"/>
         <listEntry value="MaxEpoch;;4;0;0"/>
+        <listEntry value="GSE;;3;0;0"/>
     </listAttribute>
     <stringAttribute key="modelParameterContraint" value=""/>
     <listAttribute key="modelParameterDefinitions"/>

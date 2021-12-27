@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="org.lamport.tla.toolbox.tool.tlc.modelCheck">
     <stringAttribute key="TLCCmdLineParameters" value=""/>
-    <intAttribute key="collectCoverage" value="1"/>
+    <intAttribute key="collectCoverage" value="0"/>
     <stringAttribute key="configurationName" value="Model_1"/>
     <booleanAttribute key="deferLiveness" value="false"/>
     <intAttribute key="dfidDepth" value="100"/>
@@ -12,37 +12,44 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value=""/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="59"/>
+    <intAttribute key="fpIndex" value="97"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
-    <intAttribute key="maxHeapSize" value="25"/>
+    <intAttribute key="maxHeapSize" value="17"/>
     <intAttribute key="maxSetSize" value="1000000"/>
     <booleanAttribute key="mcMode" value="true"/>
     <stringAttribute key="modelBehaviorInit" value=""/>
     <stringAttribute key="modelBehaviorNext" value=""/>
-    <stringAttribute key="modelBehaviorSpec" value="Spec"/>
+    <stringAttribute key="modelBehaviorSpec" value="Init /\ [][Next]_vars"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
     <stringAttribute key="modelBehaviorVars" value="epoch, height, n, proposal, votes"/>
     <stringAttribute key="modelComments" value=""/>
     <booleanAttribute key="modelCorrectnessCheckDeadlock" value="false"/>
     <listAttribute key="modelCorrectnessInvariants">
-        <listEntry value="0Safety"/>
+        <listEntry value="1Safety"/>
         <listEntry value="1Liveness"/>
         <listEntry value="0Inv1"/>
         <listEntry value="0BaitInv1"/>
         <listEntry value="0BaitInv2"/>
+        <listEntry value="0BaitInv3"/>
+        <listEntry value="0BaitInv4"/>
     </listAttribute>
     <listAttribute key="modelCorrectnessProperties"/>
-    <intAttribute key="modelEditorOpenTabs" value="12"/>
+    <intAttribute key="modelEditorOpenTabs" value="14"/>
     <stringAttribute key="modelExpressionEval" value=""/>
+    <stringAttribute key="modelParameterActionConstraint" value=""/>
     <listAttribute key="modelParameterConstants">
-        <listEntry value="MaxEpoch;;5;0;0"/>
+        <listEntry value="MaxEpoch;;8;0;0"/>
         <listEntry value="Tx;;{Tx1, Tx2};1;1"/>
         <listEntry value="P;;{p1, p2, p3};1;1"/>
         <listEntry value="Quorum;;{{p1,p2},{p2,p3}};0;0"/>
-        <listEntry value="GSE;;3;0;0"/>
+        <listEntry value="GSE;;5;0;0"/>
     </listAttribute>
+    <stringAttribute key="modelParameterContraint" value=""/>
+    <listAttribute key="modelParameterDefinitions"/>
+    <stringAttribute key="modelParameterModelValues" value="{}"/>
+    <stringAttribute key="modelParameterNewDefinitions" value="State1 ==&#10;/\  epoch = 3&#10;/\  height = (p1 :&gt; 0 @@ p2 :&gt; 1 @@ p3 :&gt; 1)&#10;/\  n = 2&#10;/\  proposal = &lt;&lt;&lt;&lt;3, Tx1&gt;&gt;&gt;&gt;&#10;/\  votes = ( p1 :&gt; {&lt;&lt;&lt;&lt;1, Tx1&gt;&gt;&gt;&gt;, &lt;&lt;&lt;&lt;2, Tx1&gt;&gt;&gt;&gt;, &lt;&lt;&lt;&lt;3, Tx1&gt;&gt;&gt;&gt;} @@&#10;  p2 :&gt; {&lt;&lt;&lt;&lt;1, Tx1&gt;&gt;&gt;&gt;, &lt;&lt;&lt;&lt;1, Tx1&gt;&gt;, &lt;&lt;2, Tx1&gt;&gt;&gt;&gt;} @@&#10;  p3 :&gt; {&lt;&lt;&lt;&lt;1, Tx1&gt;&gt;&gt;&gt;, &lt;&lt;&lt;&lt;1, Tx1&gt;&gt;, &lt;&lt;2, Tx1&gt;&gt;&gt;&gt;} )"/>
     <intAttribute key="modelVersion" value="20191005"/>
-    <intAttribute key="numberOfWorkers" value="3"/>
+    <intAttribute key="numberOfWorkers" value="2"/>
     <booleanAttribute key="recover" value="false"/>
     <stringAttribute key="result.mail.address" value=""/>
     <intAttribute key="simuAril" value="-1"/>
@@ -53,6 +60,8 @@
     <listAttribute key="traceExploreExpressions">
         <listEntry value="1{b \in Blocks : Tip(b)}"/>
         <listEntry value="0{b \in Blocks : Notarized(b)}"/>
+        <listEntry value="1{b \in Blocks : Final(b)}"/>
+        <listEntry value="0[b \in {b \in Blocks : Final(b)} |-&gt; Epoch(b) &gt;= GSE-1]"/>
     </listAttribute>
     <stringAttribute key="view" value=""/>
     <booleanAttribute key="visualizeStateGraph" value="false"/>

@@ -12,35 +12,49 @@ p1, p2, p3
 ----
 
 \* MV CONSTANT definitions Tx
-const_16405561335732000 == 
+const_16406398468431218000 == 
 {Tx1, Tx2}
 ----
 
 \* MV CONSTANT definitions P
-const_16405561335733000 == 
+const_16406398468431219000 == 
 {p1, p2, p3}
 ----
 
 \* SYMMETRY definition
-symm_16405561335734000 == 
-Permutations(const_16405561335732000) \union Permutations(const_16405561335733000)
+symm_16406398468431220000 == 
+Permutations(const_16406398468431218000) \union Permutations(const_16406398468431219000)
 ----
 
+\* New definitions @modelParameterNewDefinitions
+State1 ==
+/\  epoch = 3
+/\  height = (p1 :> 0 @@ p2 :> 1 @@ p3 :> 1)
+/\  n = 2
+/\  proposal = <<<<3, Tx1>>>>
+/\  votes = ( p1 :> {<<<<1, Tx1>>>>, <<<<2, Tx1>>>>, <<<<3, Tx1>>>>} @@
+  p2 :> {<<<<1, Tx1>>>>, <<<<1, Tx1>>, <<2, Tx1>>>>} @@
+  p3 :> {<<<<1, Tx1>>>>, <<<<1, Tx1>>, <<2, Tx1>>>>} )
+----
 \* CONSTANT definitions @modelParameterConstants:0MaxEpoch
-const_16405561335735000 == 
-5
+const_16406398468431221000 == 
+8
 ----
 
 \* CONSTANT definitions @modelParameterConstants:3Quorum
-const_16405561335736000 == 
+const_16406398468431222000 == 
 {{p1,p2},{p2,p3}}
 ----
 
 \* CONSTANT definitions @modelParameterConstants:4GSE
-const_16405561335737000 == 
-3
+const_16406398468431223000 == 
+5
 ----
 
+\* SPECIFICATION definition @modelBehaviorSpec:0
+spec_16406398468431224000 ==
+Init /\ [][Next]_vars
+----
 =============================================================================
 \* Modification History
-\* Created Sun Dec 26 14:02:13 PST 2021 by nano
+\* Created Mon Dec 27 13:17:26 PST 2021 by nano

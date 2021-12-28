@@ -6,19 +6,19 @@ The [Streamlet blockchain-consensus algorithm](https://eprint.iacr.org/2020/088.
 What makes Streamlet simple is that there are only two types of messages (leader proposals and votes) and processes repeat the same, simple propose-vote pattern ad infinitum.
 In contrast, protocols like Paxos or PBFT alternate between two sub-protocols: one for the normal case, when things go well, and a view-change sub-protocol to recover from failures.
 
-Even though I agree that Streamlet is concise, I think that understanding precisely why it works is not that simple.
+Even though Streamlet is concise, I think that understanding precisely why it works is not that simple.
 Moreover, the safety proof in the [original paper](https://eprint.iacr.org/2020/088.pdf) uses the operational reasoning style, where one considers an entire execution at once and one reasons about the possible ordering of events.
 In my experience, this style is very error-prone, and it's not easy to check that no case was overlooked.
 
 Instead, I'd prefer a proof that exhibits an inductive invariant that implies safety.
-This is because we only have to consider a single step, instead of an entire execution, to check whether an invariant is inductive.
-For example, why Paxos is safe is crystal clear to me because, even though the algorithm may look more complex than in Streamlet, Paxos has a simple inductive invariant that I can easily check.
+This is because we only have to consider a single step, instead of an entire execution, to check whether an invariant is inductive, and thus it's easier to not miss a case.
+For example, why Paxos is safe is crystal clear to me because, even though the algorithm may look more complex than Streamlet, Paxos has a simple inductive invariant that I can easily check.
 
 My initial goal was to find an inductive invariant that implies Streamlet's safety, at which point I could really say that I understand Streamlet.
 To build up my intuition about the algorithm, I decided to model it in TLA+ and use the TLC model-checker to test various scenarios and putative (inductive and non-inductive) invariants.
 
 I haven't found an inductive invariant for Streamlet yet, and this post is about the modeling and model-checking Streamlet in TLA+.
-Maybe I'll find an inductive invariant and write about it in the future.
+Maybe I'll find an inductive invariant  in the future and write about it.
 
 ## Model-checking with TLC
 
@@ -44,11 +44,12 @@ The goal of the Streamlet algorithm is to enable a fixed set of `N` processes in
 Although many such algorithms existed before Streamlet, Streamlet is striking because of the simplicity of the rules that processes must follow.
 
 Streamlet can tolerate malicious, Byzantine processes, but, to simplify things, here we consider only crash-stop faults and we assume that, in every execution, a strict majority of the processes do not fail.
-However, we abstract the proposal process in such a way as to model Byzantine proposals (i.e., in asynchronous epochs, processes vote for arbitrary proposals that are not the same on different processes).
+However, we abstract the proposal process in such a way as to model Byzantine proposals which, in my opinion, captures the worst that Byzantine processes can do.
 As is customary, we refer to a strict majority as a quorum.
 
 The protocol evolves in consecutive epochs (1,2,3,...) during which processes vote for blocks according to the rules below.
 A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); moreover, a special, unique genesis block has epoch number 0.
+
 A set of blocks forms a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`.
 We say that a set of blocks forms a valid block tree when the directed graph formed by the blocks is a tree rooted at the genesis block.
 A valid blockchain (or simply a chain for short) is a valid block tree in which every process has at most one successor, i.e. in which there are not forks.
@@ -87,7 +88,37 @@ Note that the original papers proves that we need 5 synchronous epochs with no f
 
 # Streamlet in PlusCal/TLA+
 
+## Blocks, block trees, and blockchains
+
+A block is a sequence; this models hash chaining, where the hash in a block determines its entire history.
+
+## Communication
+
+We abstract over the network.
+Instead of sending each other messages, we use a global data-structure that contains all the process's votes.
+
+## Leaders
+
+Initially, to check safety, we completely abstract leaders away.
+This abstraction captures malicious proposals.
+
+## First specification
+
+At this point we obtain the specification in `Streamlet.tla`
+
+## Synchrony reduction
+
+We exploit commutativity to reorder actions in a canonical order.
+
 # Liveness
+
+We assume that epoch `GSE` (for global synchronization epoch)  and all epochs after are synchronous.
+In a synchronous epoch, the leader follows the algorithm, every node receives the leader's proposal, and every node receives all the votes of the other nodes (even votes cast in previous epochs).
+This is reflected as follows in the TLA+ model:
+* In epoch `GSE` and after, nodes vote for the leader's proposal.
+* In epoch `GSE`, the leader makes a proposal, but it doesn't necessarily extend a longest notarized chain.
+  This is because, at the time of making the proposal, the leader may not have received all previous votes yet.
+* In epoch `GSE+1` and above, the leader proposes to extend one of the longest notarized chains.
 
 # Remarks
 

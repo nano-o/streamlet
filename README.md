@@ -1,14 +1,37 @@
-The [Streamlet blockchain-consensus algorithm](https://eprint.iacr.org/2020/088.pdf) is arguably one of the simplest blockchain-consensus algorithms.
-In this blog post, we'll see how to model the algorithm in PlusCal/TLA+ and model-check both its safety and liveness properties with TLC.
-This will involve making abstraction and applying reductions in order to make the model-checking problem tractable.
-Along the way, we'll make a safety argument slightly different from the original paper and we'll see that, with a small modification, it only takes at most 3 synchronous rounds for the algorithm to terminate (instead of the upper bound of 5 rounds proved in the original paper).
+In this blog post, we'll see how to model the Streamlet algorithm in PlusCal/TLA+ with a focus on abstraction that enable tractable model-checking of both its safety and liveness properties with TLC.
 
-<!-- In order to get a good understanding of the algorithm, I decided to model it in TLA+ and to model-check both its safety and liveness properties with TLC. -->
-<!-- In [their presentation of the Streamlet algorithm](https://eprint.iacr.org/2020/088.pdf), Chan and Shi provide convincing proofs; nevertheless left me wanting to understanding the algorithm on a more intuitive level. -->
+# Context and results
 
-<!-- In this post, I offer a different take on the safety of the crash-stop version of the Streamlet algorithm. -->
-<!-- In doing so, I hope to help my readers to understand the algorithm more intuitively. -->
-<!-- Moreover, I illustrate my reasoning with TLA+ models, including claims that can be checked with the TLC model-checker on small instances of the problem. -->
+The [Streamlet blockchain-consensus algorithm](https://eprint.iacr.org/2020/088.pdf) is arguably one of the simplest blockchain-consensus algorithm.
+What makes Streamlet simple is that there are only two types of messages (leader proposals and votes) and processes repeat the same, simple propose-vote pattern ad infinitum.
+In contrast, protocols like Paxos or PBFT alternate between two sub-protocols: one for the normal case, when things go well, and a view-change sub-protocol to recover from failures.
+
+Even though I agree that Streamlet is concise, I think that understanding precisely why it works is not that simple.
+Moreover, the safety proof in the [original paper](https://eprint.iacr.org/2020/088.pdf) uses the operational reasoning style, where one considers an entire execution at once and one reasons about the possible ordering of events.
+In my experience, this style is very error-prone, and it's not easy to check that no case was overlooked.
+
+Instead, I'd prefer a proof that exhibits an inductive invariant that implies safety.
+This is because we only have to consider a single step, instead of an entire execution, to check whether an invariant is inductive.
+For example, why Paxos works is crystal clear to me because, even though the algorithm may look more complex than in Streamlet, Paxos has a simple inductive invariant.
+
+My overall goal was to find an inductive invariant that implies Streamlet's safety, at which point I could really say that I understand Streamlet.
+To build up my intuition about the algorithm, I decided to model it in TLA+ and use the TLC model-checker to test various putative (inductive and non-inductive) invariants.
+However, I haven't found an inductive invariant for Streamlet yet, and this post is about the modeling and model-checking Streamlet in TLA+.
+Maybe I'll find an inductive invariant and write about it in the future.
+
+The TLC model-checker is an explicit-state model checker, which means that it can only handle fixed configurations (e.g. 3 nodes, 5 epochs, etc.)
+Moreover, TLC suffers from the state-explosion problem, where model-checking even small configurations quickly becomes intractable as the configuration size increases.
+
+To enable TLC to check the safety and liveness of Streamlet in non-trivial system sizes, I abstracted over several aspects of Streamlet (e.g. there is no network in my model).
+I believe that the abstractions I made are sound, i.e. they do not remove any behaviors, but I have not checked that mechanically.
+Finally, we will also see how to exploit commutativity to soundly and drastically restrict the number of behaviors that TLC has to explore.
+
+I was able to exhaustively check the safety and liveness properties of Streamlet in interesting configurations:
+* with 3 crash-stop nodes, 2 block payloads, and 5 asynchronous epochs;
+* with 3 crash-stop nodes, 2 block payloads, and 8 epochs among which the first 3 are asynchronous while the remaining 5 are synchronous (i.e. "GST" happens before epoch 4).
+Even though I haven't found an inductive invariant, this gives my very high confidence that Streamlet is correct.
+
+We'll also see that, with a small modification to the algorithm, we can guarantee that a new block gets finalized in 4 synchronous rounds (instead of 5 for the original algorithm).
 
 # The Streamlet algorithm
 

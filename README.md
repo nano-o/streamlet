@@ -103,7 +103,7 @@ Moreover, extending a block just means appending an epoch-payload tuple to the b
 ## First specification
 
 We start with a very simple specification which completely abstracts over leaders.
-The specification is very short, as it consists of a mere 36 lines of PlusCal with generous formatting:
+The specification is very short, as it consists of a mere 36 lines of PlusCal with generous formatting.
 
 ```
 1 --algorithm Streamlet {
@@ -149,17 +149,20 @@ We now explain this below.
 
 Note that for every process `p`, the global variable `votes[p]` contains the set of all votes cast by `p`.
 Moreover, processes keep track of their current epoch in the local variable `e` and of the height of the longest block they every voted to extend in local variable `height`.
+
 Now consider process `self` executing epoch `e`.
-At line 23, `self` either casts a vote or entirely skips epoch `e`.
-Skipping the epoch, at line 32, models the case in which `self` does not hear from the leader of epoch `e`, times out, and goes to the next epoch without voting.
-If `self` does not skip epoch `e`, it executes line 24 to 29.
+At line 23, `self` either casts a vote or skips voting in epoch `e`.
+Skipping voting in epoch `e`, at line 32, models the case in which `self` receives a proposed block that does not extend one of the longest notarized chains that `self` has seen so far, or the case in which `self` simply does not hear from the leader of epoch `e`.
+In both cases `self` goes to the next epoch without voting.
+
+If `self` does not skip voting in epoch `e`, it executes line 24 to 29.
 Line 24 and 25, `self` picks a block `b` to extend such that `b` is notarized and the length of `b` is greater or equal than the node's `height` variable.
 Lines 27 and 28, `self` picks an arbitrary payload `tx`, creates a new block `newBlock` with epoch `e` and payload `tx` extending `b`, and votes for `newBlock`.
 Finally, line 29, `self` updates its `height` variable to make sure that it will from now on only extend blocks of length at least equal to the length of `b`.
+This sequence of steps models `self` hearing the leader's proposal and voting for it, except that, for simplicity, we let different processes vote for different proposals in the same epoch.
+This is a sound abstraction as it only introduces more behaviors, and we can also think of this as modeling a malicious leader sending different proposals to different processes.
 
-Note that, at line 25, we also require that `b`'s epoch be strictly smaller than `e`, and this constraint is not in the Streamlet paper.
-As we will see later, this additional constraint allows thinking of the algorithm as proceeding in synchronous rounds, which we can use to speed up model-checking significantly.
-Moreover, it doesn't hurt the protocol in any way. (TODO: confirm with TLC that not doing it is safe).
+Note that, at line 25, we also require that `b`'s epoch be strictly smaller than `e`; this models the fact, assumed in the paper, that processes have synchronized clocks and thus progress from epoch to epoch at the same time.
 
 ## Leaders
 

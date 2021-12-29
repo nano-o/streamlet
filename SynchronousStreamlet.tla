@@ -56,25 +56,28 @@ l1:     while (epoch \in E) {
                 setProposal()
             };
             with (proc = Proc(n)) \* process number n takes a step
-            either {
-                \* vote for the proposal if possible
-                if (height[proc] <= Len(proposal)-1) {
-                    votes[proc] := @ \cup {proposal};
-                    height[proc] := Len(proposal)-1;
+            \* learn from a possibly new notarized block:
+            with (b \in Blocks \cup {<<>>}) {
+                when Notarized(b) /\ Len(b) >= height[proc] /\ Epoch(b) < epoch;
+                either {
+                    if (height[proc] <= Len(proposal)-1) { \* vote if possible
+                        votes[proc] := @ \cup {proposal};
+                        height[proc] := Len(proposal)-1;
+                    }
+                    else \* skip voting
+                        height[proc] := Len(b);
                 }
-                else \* else skip the epoch
-                    skip;
-            }
-            or { \* if before GSE, skip this epoch
-                when epoch < GSE;
-                skip
+                or {
+                    when epoch < GSE;
+                    skip
+                }
             };
             setupNextStep()
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "a7bd4c15" /\ chksum(tla) = "fca4eb57")
+\* BEGIN TRANSLATION (chksum(pcal) = "96b01c05" /\ chksum(tla) = "bfbc7cd")
 VARIABLES height, votes, epoch, n, proposal, pc
 
 (* define statement *)
@@ -120,14 +123,16 @@ l1(self) == /\ pc[self] = "l1"
                              ELSE /\ TRUE
                                   /\ UNCHANGED proposal
                        /\ LET proc == Proc(n) IN
-                            \/ /\ IF height[proc] <= Len(proposal')-1
-                                     THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
-                                          /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
-                                     ELSE /\ TRUE
-                                          /\ UNCHANGED << height, votes >>
-                            \/ /\ epoch < GSE
-                               /\ TRUE
-                               /\ UNCHANGED <<height, votes>>
+                            \E b \in Blocks \cup {<<>>}:
+                              /\ Notarized(b) /\ Len(b) >= height[proc] /\ Epoch(b) < epoch
+                              /\ \/ /\ IF height[proc] <= Len(proposal')-1
+                                          THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
+                                               /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
+                                          ELSE /\ height' = [height EXCEPT ![proc] = Len(b)]
+                                               /\ votes' = votes
+                                 \/ /\ epoch < GSE
+                                    /\ TRUE
+                                    /\ UNCHANGED <<height, votes>>
                        /\ IF n = Cardinality(P)
                              THEN /\ n' = 1
                                   /\ epoch' = epoch+1
@@ -163,5 +168,5 @@ BaitInv5 == \neg (
     /\ epoch = 6 /\ \A b \in Blocks : Notarized(b) => Epoch(b) # 5 )
 =============================================================================
 \* Modification History
-\* Last modified Tue Dec 28 22:36:36 PST 2021 by nano
+\* Last modified Tue Dec 28 22:52:23 PST 2021 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

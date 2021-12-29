@@ -7,9 +7,10 @@ EXTENDS Common
     variables
         votes = [p \in P |-> {}], \* the votes cast by the processes,
     define {
-        Blocks == {<<>>} \cup UNION {votes[p] : p \in P}
+        Blocks == UNION {votes[p] : p \in P}
         Notarized(b) == 
-            b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
+            \/  b = Root \* we consider the root as notarized by default 
+            \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
         \* Final blocks:
         Final(b) == 
             /\  b # Root
@@ -26,28 +27,30 @@ EXTENDS Common
             epoch = 1; \* the current epoch of p
     {
 l1:     while (epoch \in E) {
-            either { \* proc extends a longer notarized chain with a vote
-                with (b \in Blocks) { \* the notarized block we're going to extend
-                    when Len(b) >= height /\ Notarized(b) /\ Epoch(b) < epoch;
-                     \* pick a payload and form the new block:
+            \* pick a possibly new notarized block of sufficient height:
+            with (b \in Blocks \cup {<<>>}) {
+                when Notarized(b) /\ Len(b) >= height /\ Epoch(b) < epoch;
+                height := Len(b);
+                either 
+                    \* pick a payload, form a new block, and vote:
                     with (tx \in Tx, newB = Append(b, <<epoch, tx>>))
                         votes[self] := @ \cup {newB};
-                    height := Len(b);
-                }
-            }
-            or skip; \* skip this epoch
+                or
+                    skip \* skip voting
+            };
             epoch := epoch + 1;
         }
     }
 }
 *) 
-\* BEGIN TRANSLATION (chksum(pcal) = "2d8e611" /\ chksum(tla) = "36091f03")
+\* BEGIN TRANSLATION (chksum(pcal) = "9a06292a" /\ chksum(tla) = "ff6aaabd")
 VARIABLES votes, pc
 
 (* define statement *)
-Blocks == {<<>>} \cup UNION {votes[p] : p \in P}
+Blocks == UNION {votes[p] : p \in P}
 Notarized(b) ==
-    b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
+    \/  b = Root
+    \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
 
 Final(b) ==
     /\  b # Root
@@ -73,14 +76,14 @@ Init == (* Global variables *)
 
 l1(self) == /\ pc[self] = "l1"
             /\ IF epoch[self] \in E
-                  THEN /\ \/ /\ \E b \in Blocks:
-                                  /\ Len(b) >= height[self] /\ Notarized(b) /\ Epoch(b) < epoch[self]
-                                  /\ \E tx \in Tx:
+                  THEN /\ \E b \in Blocks \cup {<<>>}:
+                            /\ Notarized(b) /\ Len(b) >= height[self] /\ Epoch(b) < epoch[self]
+                            /\ height' = [height EXCEPT ![self] = Len(b)]
+                            /\ \/ /\ \E tx \in Tx:
                                        LET newB == Append(b, <<epoch[self], tx>>) IN
                                          votes' = [votes EXCEPT ![self] = @ \cup {newB}]
-                                  /\ height' = [height EXCEPT ![self] = Len(b)]
-                          \/ /\ TRUE
-                             /\ UNCHANGED <<votes, height>>
+                               \/ /\ TRUE
+                                  /\ votes' = votes
                        /\ epoch' = [epoch EXCEPT ![self] = epoch[self] + 1]
                        /\ pc' = [pc EXCEPT ![self] = "l1"]
                   ELSE /\ pc' = [pc EXCEPT ![self] = "Done"]
@@ -106,5 +109,5 @@ BaitInv1 == \A b \in Blocks : \neg Final(b)
 BaitInv2 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Final(b2) /\ \neg Compatible(b1, b2))
 =============================================================================
 \* Modification History
-\* Last modified Mon Dec 27 15:24:47 PST 2021 by nano
+\* Last modified Tue Dec 28 22:18:38 PST 2021 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

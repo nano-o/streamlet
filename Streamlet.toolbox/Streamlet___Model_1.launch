@@ -12,7 +12,7 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value=""/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="66"/>
+    <intAttribute key="fpIndex" value="13"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
     <intAttribute key="maxHeapSize" value="20"/>
     <intAttribute key="maxSetSize" value="1000000"/>
@@ -43,7 +43,7 @@
         <listEntry value="Quorum;;{{p1,p2},{p2,p3}};0;0"/>
         <listEntry value="Tx;;{Tx1, Tx2};1;1"/>
         <listEntry value="MaxEpoch;;4;0;0"/>
-        <listEntry value="GSE;;3;0;0"/>
+        <listEntry value="GSE;;5;0;0"/>
     </listAttribute>
     <stringAttribute key="modelParameterContraint" value=""/>
     <listAttribute key="modelParameterDefinitions"/>

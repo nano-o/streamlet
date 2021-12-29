@@ -88,19 +88,89 @@ Note that the original papers proves that we need 5 synchronous epochs with no f
 
 # Streamlet in PlusCal/TLA+
 
-## Blocks, block trees, and blockchains
+## Blocks
 
-A block is a sequence; this models hash chaining, where the hash in a block determines its entire history.
+Processes in the Streamlet algorithm can be seen as building a block tree out of which emerges a unique, finalized blockchain.
+Thus, we need to model blocks, block trees, and blockchains.
 
-## Communication
+Except for the genesis block, a block consists of the hash of its parent block, an epoch, and a payload.
+Thus, if we assume that there are no hash collisions, a block uniquely determines all its ancestors up to the genesis block.
+We could model a block as a recursive data structure, but, to simplify the spec, we model a block as a sequence of pairs, each containing an epoch and a payload.
 
-We abstract over the network.
-Instead of sending each other messages, we use a global data-structure that contains all the process's votes.
+With this model of blocks, a block tree is just a set of blocks, and a blockchain and a block are the same thing.
+Moreover, extending a block just means appending an epoch-payload tuple to the block.
+
+## First specification
+
+We start with a very simple specification which completely abstracts over leaders.
+The specification is very short, as it consists of a mere 36 lines of PlusCal with generous formatting:
+
+```
+1 --algorithm Streamlet {
+2     variables
+3         votes = [p \in P |-> {}], \* the votes cast by the processes,
+4     define {
+5         Blocks == UNION {votes[p] : p \in P}
+6         Notarized(b) ==
+7             \/  b = <<>>
+8             \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
+9         Final(b) ==
+10              /\  b # <<>> \* we consider the root notarized by default
+11              /\  \E tx \in Tx :
+12                      /\  Notarized(Append(b, <<Epoch(b)+1,tx>>))
+13                      /\  Epoch(Parent(b)) = Epoch(b)-1
+14            Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
+15                Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
+16        }
+17        process (p \in P)
+18            variables
+19                height = 0, \* height of the longest notarized chain seen by p
+20                epoch = 1; \* the current epoch of p
+21        {
+22    l1:     while (epoch \in E) {
+23                either { \* proc extends a longer notarized chain with a vote
+24                    with (b \in Blocks \cup {<<>>}) { \* pick a block to extend
+25                        when Len(b) >= height /\ Notarized(b) /\ Epoch(b) < epoch;
+26                         \* pick a payload and form the new block:
+27                        with (tx \in Tx, newBlock = Append(b, <<epoch, tx>>))
+28                            votes[self] := @ \cup {newBlock}; \* cast a vote
+29                        height := Len(b);
+30                    }
+31                }
+32                or skip; \* skip this epoch
+33                epoch := epoch + 1;
+34            }
+35        }
+36    }
+```
+
+The most interesting aspect of the specification is how we abstract over network communication while faithfully modeling the asynchronous nature of the system.
+We now explain this below.
+
+Note that for every process `p`, the global variable `votes[p]` contains the set of all votes cast by `p`.
+Moreover, processes keep track of their current epoch in the local variable `e` and of the height of the longest block they every voted to extend in local variable `height`.
+Now consider process `self` executing epoch `e`.
+At line 23, `self` either casts a vote or entirely skips epoch `e`.
+Skipping the epoch, at line 32, models the case in which `self` does not hear from the leader of epoch `e`, times out, and goes to the next epoch without voting.
+If `self` does not skip epoch `e`, it executes line 24 to 29.
+Line 24 and 25, `self` picks a block `b` to extend such that `b` is notarized and the length of `b` is greater or equal than the node's `height` variable.
+Lines 27 and 28, `self` picks an arbitrary payload `tx`, creates a new block `newBlock` with epoch `e` and payload `tx` extending `b`, and votes for `newBlock`.
+Finally, line 29, `self` updates its `height` variable to make sure that it will from now on only extend blocks of length at least equal to the length of `b`.
+
+Note that, at line 25, we also require that `b`'s epoch be strictly smaller than `e`, and this constraint is not in the Streamlet paper.
+As we will see later, this additional constraint allows thinking of the algorithm as proceeding in synchronous rounds, which we can use to speed up model-checking significantly.
+Moreover, it doesn't hurt the protocol in any way. (TODO: confirm with TLC that not doing it is safe).
 
 ## Leaders
 
-Initially, to check safety, we completely abstract leaders away.
-This abstraction captures malicious proposals.
+Leaders in Streamlet only help liveness, and for our first model we will only look at Safety.
+So, we do not model leaders at all in this first model, and instead we let nodes vote an arbitrary notarized block whose height is greater or equal to the height of the last block that the node extended.
+
+## Communication
+
+We do not model the network explicitly.
+Instead, for every process `p`, a global variable `votes[p]` corresponds to the set of votes cast by `p`.
+Then, we define `Blocks` as the set of all votes by all processes, i.e. `Blocks == UNION {votes[p] : p \in P}`
 
 ## First specification
 

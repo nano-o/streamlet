@@ -94,92 +94,125 @@ Processes in the Streamlet algorithm can be seen as building a block tree out of
 Thus, we need to model blocks, block trees, and blockchains.
 
 Except for the genesis block, a block consists of the hash of its parent block, an epoch, and a payload.
-Thus, if we assume that there are no hash collisions, a block uniquely determines all its ancestors up to the genesis block.
-We could model a block as a recursive data structure, but, to simplify the spec, we model a block as a sequence of pairs, each containing an epoch and a payload.
+Thus, assuming that there are no hash collisions, a block uniquely determines all its ancestors up to the genesis block, or, equivalently, a unique sequence of epoch-payload pairs.
+To model this situation, we could model a block as a recursive data structure containing its parent.
+However, to make things simpler, we model a block as a sequence of pairs, each containing an epoch and a payload.
+No information is lost in the process: in both cases, a block determines a unique sequence of epoch-payload pairs.
 
-With this model of blocks, a block tree is just a set of blocks, and a blockchain and a block are the same thing.
-Moreover, extending a block just means appending an epoch-payload tuple to the block.
+In this model of blocks, a block tree is a prefix-closed set of blocks, and a blockchain is a block tree without branching.
+Moreover, extending a block `b` jeans appending an epoch-payload tuple to the block `b`.
+Finally, the genesis block is the empty sequence `<<>>`.
+
+We now define the epoch of a block `b` as `0` if `b` is the genesis block and otherwise as the epoch found in the last tuple in `b`.
+In TLA+, this translates to:
+
+```
+  Epoch(b) ==
+      IF b = Genesis
+      THEN 0
+      ELSE b[Len(b)][1]
+```
+
+Moreover, the parent of a block `b` is the genesis block if `b` has length 1, and otherwise it's the block obtained by removing the last element of `b`.
+In TLA+:
+
+```
+  Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1)
+```
 
 ## First specification
 
-We start with a very simple specification which completely abstracts over leaders.
-The specification is very short, as it consists of a mere 36 lines of PlusCal with generous formatting.
+We start with a specification that makes use of non-determinism in order to eschew irrelevant details and capture the essence of how Streamlet ensures safety.
+The specification, appearing below and in `Streamlet.tla`, is very short.
+With generous formatting, it consists of a mere 44 lines of PlusCal.
 
 ```
-1 --algorithm Streamlet {
-2     variables
-3         votes = [p \in P |-> {}], \* the votes cast by the processes,
-4     define {
-5         Blocks == UNION {votes[p] : p \in P}
-6         Notarized(b) ==
-7             \/  b = <<>>
-8             \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
-9         Final(b) ==
-10              /\  b # <<>> \* we consider the root notarized by default
-11              /\  \E tx \in Tx :
-12                      /\  Notarized(Append(b, <<Epoch(b)+1,tx>>))
-13                      /\  Epoch(Parent(b)) = Epoch(b)-1
-14            Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
-15                Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
-16        }
-17        process (p \in P)
-18            variables
-19                height = 0, \* height of the longest notarized chain seen by p
-20                epoch = 1; \* the current epoch of p
-21        {
-22    l1:     while (epoch \in E) {
-23                either { \* proc extends a longer notarized chain with a vote
-24                    with (b \in Blocks \cup {<<>>}) { \* pick a block to extend
-25                        when Len(b) >= height /\ Notarized(b) /\ Epoch(b) < epoch;
-26                         \* pick a payload and form the new block:
-27                        with (tx \in Tx, newBlock = Append(b, <<epoch, tx>>))
-28                            votes[self] := @ \cup {newBlock}; \* cast a vote
-29                        height := Len(b);
-30                    }
-31                }
-32                or skip; \* skip this epoch
-33                epoch := epoch + 1;
-34            }
-35        }
-36    }
+1   --algorithm Streamlet {
+2       variables
+3           vote = [p \in P |-> {}], \* the vote cast by the processes,
+4           proposal = [e \in E |-> <<>>];
+5       define {
+6           E == 1..MaxEpoch \* the set of epochs
+7           Genesis == <<>>
+8           Epoch(b) ==  \* the epoch of a block
+9               IF b = Genesis
+10              THEN 0 \* note how the root is by convention a block with epoch 0
+11              ELSE b[Len(b)][1]
+12          Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1) \* the parent of a block
+13          Blocks == UNION {vote[p] : p \in P}
+14          Notarized == {Genesis} \cup \* Genesis is considered notarized by default
+15              { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in vote[p] }
+16          Final(b) ==
+17              /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
+18              /\  Epoch(Parent(b)) = Epoch(b)-1
+19          Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
+20              Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
+21      }
+22      process (proc \in P)
+23          variables
+24              epoch = 1, \* the current epoch of p
+25              height = 0; \* height of the longest notarized chain seen by p
+26      {
+27  l1:     while (epoch \in E) {
+28              \* if leader, make a proposal:
+29              if (Leader(epoch) = self) {
+30                  with (parent \in {b \in Notarized : height <= Len(b) /\ Epoch(b) <= epoch},
+31                          tx \in Tx, b = Append(parent, <<epoch, tx>>))
+32                      proposal[epoch] := b
+33              };
+34              \* next, either vote for the leader's proposal or skip:
+35              either {
+36                  when Len(proposal[epoch]) > height;
+37                  vote[self] := @ \cup {proposal[epoch]};
+38                  height := Len(proposal[epoch])-1
+39              } or skip;
+40              \* finally, go to the next epoch:
+41              epoch := epoch + 1;
+42          }
+43      }
+44  }
 ```
 
-The most interesting aspect of the specification is how we abstract over network communication while faithfully modeling the asynchronous nature of the system.
-We now explain this below.
+Let me now describe the specification informally.
 
-Note that for every process `p`, the global variable `votes[p]` contains the set of all votes cast by `p`.
-Moreover, processes keep track of their current epoch in the local variable `e` and of the height of the longest block they every voted to extend in local variable `height`.
+We have two global variables, `vote` and `proposal`, and two process-local variables, `epoch` and `height`, with the following meaning:
+- For every process `p`, `vote[p]` is the set of all votes cast by `p` so far.
+- For every epoch `e`, `proposal[e]` is the leader's proposal for epoch `e` unless `proposal[e]` is empty (i.e. equal to the empty sequence `<<>>`).
+- For every process, the local variable `epoch` is the current epoch the process.
+- For every process, the local variable `height` is the height of the longest notarized block that the process ever voted to extend.
 
-Now consider process `self` executing epoch `e`.
-At line 23, `self` either casts a vote or skips voting in epoch `e`.
-Skipping voting in epoch `e`, at line 32, models the case in which `self` receives a proposed block that does not extend one of the longest notarized chains that `self` has seen so far, or the case in which `self` simply does not hear from the leader of epoch `e`.
-In both cases `self` goes to the next epoch without voting.
+Lines 6 to 20, we make a few useful definitions, most notably:
+- Line 14, a block is notarized when a quorum unanimously voted for it.
+- Line 16, a block `b` is final when:
+  - line 17, `b` has a notarized child with epoch `Epoch(b)+1`, and
+  - line 18, the epoch of `b`'s parent is `Epoch(b)-1`
+* Finally, line 19, the algorithm is safe when every two final blocks are the same up to the length of the shortest.
 
-If `self` does not skip voting in epoch `e`, it executes line 24 to 29.
-Line 24 and 25, `self` picks a block `b` to extend such that `b` is notarized and the length of `b` is greater or equal than the node's `height` variable.
-Lines 27 and 28, `self` picks an arbitrary payload `tx`, creates a new block `newBlock` with epoch `e` and payload `tx` extending `b`, and votes for `newBlock`.
-Finally, line 29, `self` updates its `height` variable to make sure that it will from now on only extend blocks of length at least equal to the length of `b`.
-This sequence of steps models `self` hearing the leader's proposal and voting for it, except that, for simplicity, we let different processes vote for different proposals in the same epoch.
-This is a sound abstraction as it only introduces more behaviors, and we can also think of this as modeling a malicious leader sending different proposals to different processes.
+Now consider a process we will call `self` at line 27, when `self` is just starting it current epoch `epoch`.
 
-Note that, at line 25, we also require that `b`'s epoch be strictly smaller than `e`; this models the fact, assumed in the paper, that processes have synchronized clocks and thus progress from epoch to epoch at the same time.
+First, lines 29 to 33, if `self` is the leader of the current epoch, `self` picks a notarized block show length is greater than `height`, extends it with a new payload `tx`, and proposes it for the epoch.
+This is an example of how we use non-determinism to abstract over irrelevant details:
+In the original Streamlet algorithm, a process creates a proposal by extending one of the longest notarized chains it knows of.
+Here we abstract over this rule by allowing the process to pick an arbitrary notarized block.
+This is a sound abstraction because it does not restrict the behaviors of the algorithm (in fact, it may add new behaviors).
 
-## Leaders
+Next, line 35, `self` either votes for the leader's proposal or skips voting in this epoch
+- Line 36, `self` checks that the proposal extends a block whose height is at least the height of last block that `self` voted to extend.
+  If so, `self` votes for the proposal (line 37) and updates `height` to reflect the fact that it just voted to extend a block of height equal to the length of the proposal minus one.
+- Alternatively, line 39, `self` skips voting in this epoch.
+  This models the case in which `self` did not receive the leader's proposal, or the proposal is not at least of height equal to the height of the longest notarized block that `self` ever voted to extend.
 
-Leaders in Streamlet only help liveness, and for our first model we will only look at Safety.
-So, we do not model leaders at all in this first model, and instead we let nodes vote an arbitrary notarized block whose height is greater or equal to the height of the last block that the node extended.
+Finally, line 41, `self` goes to the next epoch.
 
-## Communication
+### Model-checking results
 
-We do not model the network explicitly.
-Instead, for every process `p`, a global variable `votes[p]` corresponds to the set of votes cast by `p`.
-Then, we define `Blocks` as the set of all votes by all processes, i.e. `Blocks == UNION {votes[p] : p \in P}`
+With TLC, I was able to exhaustively model-check that the `Safety` property holds for 3 processes, 2 payloads, and 6 epochs.
+This was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC, and it took about 4 hours.
 
-## First specification
+I think this is an interesting configuration because we have multiple quorums (sets of 2 processes at least), branching even within a single epoch (because of the 2 payloads), and enough epochs to obtain finalized chains containing non-consecutive epoch numbers and having notarized but non-final branches.
+Thus, the model-checking results give me high confidence that the Streamlet algorithm is indeed safe.
 
-At this point we obtain the specification in `Streamlet.tla`
-
-## Synchrony reduction
+## Liveness and synchronous reduction
 
 We exploit commutativity to reorder actions in a canonical order.
 

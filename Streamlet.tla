@@ -140,7 +140,9 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 BaitInv1 == \A b \in Blocks : \neg Final(b)
 BaitInv2 == \neg (\E b1,b2 \in Notarized : Final(b2) /\ \neg Compatible(b1, b2))
+\* Find a final chain with non-consecutive epoch numbers:
+BaitInv3 == \neg (\E b \in Notarized : Final(b) /\ Epoch(b) # Epoch(SubSeq(b,1,1))+Len(b)-1)
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 15:43:55 PST 2022 by nano
+\* Last modified Sun Jan 02 15:58:58 PST 2022 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

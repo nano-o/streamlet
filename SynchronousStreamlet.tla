@@ -1,6 +1,19 @@
 ------------------------ MODULE SynchronousStreamlet ------------------------
 
-EXTENDS Common
+EXTENDS Sequences, FiniteSets, Integers
+
+CONSTANTS
+        P \* The set of processes
+    ,   Tx \* Transtaction sets (the payload in a block)
+    ,   MaxEpoch
+    ,   Quorum \* The set of quorums
+    ,   GSE
+    
+Num == \* assigns a process number to each process
+    CHOOSE f \in [P -> 1..Cardinality(P)] : 
+        \A p1,p2 \in P : p1 # p2 => f[p1] # f[p2]
+Proc(n) == \* the inverse of Num
+    CHOOSE p \in P : Num[p] = n
 
 (* 
 --algorithm Streamlet {
@@ -9,95 +22,114 @@ EXTENDS Common
         votes = [p \in P |-> {}], \* the votes cast by the processes
         epoch = 1, \* the current epoch
         n = 1, \* the next process to take a step
-        proposal = <<>>; \* in a synchronous epoch, the proposal of the leader
+        proposal = <<>>; \* the proposal of the leader for the current epoch
     define {
+        E == 1..MaxEpoch
+        Max(X) == CHOOSE x \in X : \A y \in X : y <= x
+        Root == <<>>
+        Epoch(b) ==  \* the epoch of a block
+            IF b = <<>> 
+            THEN 0 \* note how the root is by convention a block with epoch 0
+            ELSE b[Len(b)][1]
+        Parent(b) == IF Len(b) = 1 THEN Root ELSE SubSeq(b, 1, Len(b)-1) \* the parent of a block
+        Prefix(b1, b2) ==
+            /\  Len(b1) <= Len(b2)
+            /\  \/  b1 = Root
+                \/  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
+        Compatible(b1, b2) == Prefix(b1, b2) \/ Prefix(b2, b1)
         Blocks == UNION {votes[p] : p \in P}
-        Notarized(b) == b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
+        Notarized == {Root} \cup \* Root is considered notarized by default 
+            { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in votes[p] }
         \* Final blocks:
-        Final(b) == 
-            /\  b # Root
-            /\  \E tx \in Tx :
-                    /\  Notarized(Append(b, <<Epoch(b)+1,tx>>))
-                    /\  Epoch(Parent(b)) = Epoch(b)-1
-        \* Main safety property:
-        Safety == \A b1,b2 \in {b \in Blocks : Final(b)} : Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
+        Final(b) ==  
+            /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
+            /\  Epoch(Parent(b)) = Epoch(b)-1
+        \* Safety property:
+        Safety == \A b1,b2 \in {b \in Blocks : Final(b)} : 
+            Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
         \* Liveness property; it takes at most 4 epochs to finalize a new block: 
         Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
         \* Invariants:
         Inv1 == \A b \in Blocks : Final(b) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
-        Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ Notarized(b2) /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
-        Inv3 == \A b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
-        Inv4 == \A b \in Blocks : Notarized(b) /\ (\E tx \in Tx : Notarized(Append(b, <<Epoch(b)+1, tx>>))) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
-    }
-    macro setProposal() {
-        with (b \in Blocks \cup {<<>>}) { \* first pick a block to extend
-            \* leader picks a notarized block:
-            when Notarized(b);
-            \* after the first synchronous epoch, the leader picks the notarized block with the most recent epoch:
-            \* when epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Epoch(b2) <= Epoch(b);
-            \* I thought that, with the version of the paper, there should be a violation when GSE=5. But that's not the case it seems.
-            when epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Len(b2) <= Len(b);
-            with (tx \in Tx)
-                proposal := Append(b, <<epoch,tx>>)
-        }
-    }
-    macro setupNextStep() {
-        if (n = Cardinality(P)) {
-            n := 1;
-            epoch := epoch+1
-        }
-        else
-            n := n+1
+        Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ b2 \in Notarized /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
+        Inv3 == \A b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
+        Inv4 == \A b \in Blocks : b \in Notarized /\ (\E tx \in Tx : Append(b, <<Epoch(b)+1, tx>>)) \in Notarized 
+                    => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
     }
     process (scheduler \in {"sched"})
     {
 l1:     while (epoch \in E) {
-            if (n = 1) { \* we're starting the epoch, so pick a proposal
-                setProposal()
+           if (n = 1) { \* we're starting the epoch, so pick a proposal
+                with (b \in Notarized) {
+                    \* after the first synchronous epoch, the leader is able to pick a notarized block with the highest height:
+                    when epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(b);
+                    with (tx \in Tx)
+                        proposal := Append(b, <<epoch,tx>>)
+                }
             };
             with (proc = Proc(n)) \* process number n takes a step
-            \* learn from a possibly new notarized block:
-            with (b \in Blocks \cup {<<>>}) {
-                when Notarized(b) /\ Len(b) >= height[proc] /\ Epoch(b) < epoch;
-                either {
-                    if (height[proc] <= Len(proposal)-1) { \* vote if possible
+            \* if possible, vote for the leader's proposal:
+            either {
+                with (maxLen \in height[proc]..Max({Len(b) : b \in Notarized})) { \* the max notarized length known to proc
+                    when epoch > GSE => \A b2 \in Notarized : Len(b2) <= maxLen;
+                    if (maxLen <= Len(proposal)-1) { \* vote if possible
                         votes[proc] := @ \cup {proposal};
                         height[proc] := Len(proposal)-1;
                     }
-                    else \* skip voting
-                        height[proc] := Len(b);
+                    else 
+                        height[proc] := maxLen;
                 }
-                or {
-                    when epoch < GSE;
-                    skip
-                }
+            }
+            or {
+                when epoch < GSE; \* Before GSE, we may miss the leader's proposal
+                skip
             };
-            setupNextStep()
+            \* now schedule the next process:
+            if (n = Cardinality(P)) {
+                n := 1;
+                epoch := epoch+1
+            }
+            else
+                n := n+1
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "96b01c05" /\ chksum(tla) = "bfbc7cd")
+\* BEGIN TRANSLATION (chksum(pcal) = "690fe5e5" /\ chksum(tla) = "6d41a688")
 VARIABLES height, votes, epoch, n, proposal, pc
 
 (* define statement *)
+E == 1..MaxEpoch
+Max(X) == CHOOSE x \in X : \A y \in X : y <= x
+Root == <<>>
+Epoch(b) ==
+    IF b = <<>>
+    THEN 0
+    ELSE b[Len(b)][1]
+Parent(b) == IF Len(b) = 1 THEN Root ELSE SubSeq(b, 1, Len(b)-1)
+Prefix(b1, b2) ==
+    /\  Len(b1) <= Len(b2)
+    /\  \/  b1 = Root
+        \/  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
+Compatible(b1, b2) == Prefix(b1, b2) \/ Prefix(b2, b1)
 Blocks == UNION {votes[p] : p \in P}
-Notarized(b) == b = Root \/ \E Q \in Quorum : \A p \in Q : b \in votes[p]
+Notarized == {Root} \cup
+    { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in votes[p] }
 
 Final(b) ==
-    /\  b # Root
-    /\  \E tx \in Tx :
-            /\  Notarized(Append(b, <<Epoch(b)+1,tx>>))
-            /\  Epoch(Parent(b)) = Epoch(b)-1
+    /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
+    /\  Epoch(Parent(b)) = Epoch(b)-1
 
-Safety == \A b1,b2 \in {b \in Blocks : Final(b)} : Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
+Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
+    Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
 
 Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
 
 Inv1 == \A b \in Blocks : Final(b) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
-Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ Notarized(b2) /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
-Inv3 == \A b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
-Inv4 == \A b \in Blocks : Notarized(b) /\ (\E tx \in Tx : Notarized(Append(b, <<Epoch(b)+1, tx>>))) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
+Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ b2 \in Notarized /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
+Inv3 == \A b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
+Inv4 == \A b \in Blocks : b \in Notarized /\ (\E tx \in Tx : Append(b, <<Epoch(b)+1, tx>>)) \in Notarized
+            => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
 
 
 vars == << height, votes, epoch, n, proposal, pc >>
@@ -115,24 +147,23 @@ Init == (* Global variables *)
 l1(self) == /\ pc[self] = "l1"
             /\ IF epoch \in E
                   THEN /\ IF n = 1
-                             THEN /\ \E b \in Blocks \cup {<<>>}:
-                                       /\ Notarized(b)
-                                       /\ epoch >= GSE+1 => \A b2 \in Blocks : Notarized(b2) => Len(b2) <= Len(b)
+                             THEN /\ \E b \in Notarized:
+                                       /\ epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(b)
                                        /\ \E tx \in Tx:
                                             proposal' = Append(b, <<epoch,tx>>)
                              ELSE /\ TRUE
                                   /\ UNCHANGED proposal
                        /\ LET proc == Proc(n) IN
-                            \E b \in Blocks \cup {<<>>}:
-                              /\ Notarized(b) /\ Len(b) >= height[proc] /\ Epoch(b) < epoch
-                              /\ \/ /\ IF height[proc] <= Len(proposal')-1
+                            \/ /\ \E maxLen \in height[proc]..Max({Len(b) : b \in Notarized}):
+                                    /\ epoch > GSE => \A b2 \in Notarized : Len(b2) <= maxLen
+                                    /\ IF maxLen <= Len(proposal')-1
                                           THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
                                                /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
-                                          ELSE /\ height' = [height EXCEPT ![proc] = Len(b)]
+                                          ELSE /\ height' = [height EXCEPT ![proc] = maxLen]
                                                /\ votes' = votes
-                                 \/ /\ epoch < GSE
-                                    /\ TRUE
-                                    /\ UNCHANGED <<height, votes>>
+                            \/ /\ epoch < GSE
+                               /\ TRUE
+                               /\ UNCHANGED <<height, votes>>
                        /\ IF n = Cardinality(P)
                              THEN /\ n' = 1
                                   /\ epoch' = epoch+1
@@ -158,15 +189,15 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 \* END TRANSLATION 
 
 \* The tip of a notarized chain:
-Tip(b) == Notarized(b) /\ \A b2 \in Blocks : Prefix(b,b2) => \neg Notarized(b2)
+Tip(b) == b \in Notarized /\ \A b2 \in Blocks: b # b2 /\ Prefix(b,b2) => \neg b2 \in Notarized
 BaitInv1 == \A b \in Blocks : \neg Final(b)
-BaitInv2 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Final(b2) /\ \neg Compatible(b1, b2))
-BaitInv3 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Len(b1) = 2 /\ proposal = b2 /\ \neg Compatible(b1,b2))
-BaitInv4 == \neg (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Len(b1) = 2 /\ Len(b2) = 2 /\ \neg Compatible(b1,b2) /\ \neg Compatible(SubSeq(b1,1,1),SubSeq(b2,1,1)))
+BaitInv2 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Final(b2) /\ \neg Compatible(b1, b2))
+BaitInv3 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ Len(b1) = 2 /\ proposal = b2 /\ \neg Compatible(b1,b2))
+BaitInv4 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Len(b1) = 2 /\ Len(b2) = 2 /\ \neg Compatible(b1,b2) /\ \neg Compatible(SubSeq(b1,1,1),SubSeq(b2,1,1)))
 BaitInv5 == \neg (
-    (\E b1,b2 \in Blocks : Notarized(b1) /\ Notarized(b2) /\ Len(b1) = 2 /\ Len(b2) = 2 /\ \neg Compatible(b1,b2) /\ \neg Compatible(SubSeq(b1,1,1),SubSeq(b2,1,1)))
-    /\ epoch = 6 /\ \A b \in Blocks : Notarized(b) => Epoch(b) # 5 )
+    (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Len(b1) = 2 /\ Len(b2) = 2 /\ \neg Compatible(b1,b2) /\ \neg Compatible(SubSeq(b1,1,1),SubSeq(b2,1,1)))
+    /\ epoch = 6 /\ \A b \in Blocks : b \in Notarized => Epoch(b) # 5 )
 =============================================================================
 \* Modification History
-\* Last modified Tue Dec 28 22:52:23 PST 2021 by nano
+\* Last modified Sun Jan 02 14:49:47 PST 2022 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

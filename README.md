@@ -1,4 +1,4 @@
-In this blog post, we'll see how to model the Streamlet algorithm in PlusCal/TLA+ with a focus on abstraction that enable tractable model-checking of both its safety and liveness properties with TLC.
+In this blog post, we will see how to model the Streamlet algorithm in PlusCal/TLA+ with a focus on writing simple specifications that are amenable to model-checking of both safety and liveness properties with TLC.
 
 # Context and results
 
@@ -6,19 +6,25 @@ The [Streamlet blockchain-consensus algorithm](https://eprint.iacr.org/2020/088.
 What makes Streamlet simple is that there are only two types of messages (leader proposals and votes) and processes repeat the same, simple propose-vote pattern ad infinitum.
 In contrast, protocols like Paxos or PBFT alternate between two sub-protocols: one for the normal case, when things go well, and a view-change sub-protocol to recover from failures.
 
-Even though Streamlet is concise, I think that understanding precisely why it works is not that simple.
-Moreover, the safety proof in the [original paper](https://eprint.iacr.org/2020/088.pdf) uses the operational reasoning style, where one considers an entire execution at once and one reasons about the possible ordering of events.
-In my experience, this style is very error-prone, and it's not easy to check that no case was overlooked.
+The proofs in the Streamlet paper use the operational reasoning style, where we consider an entire execution and try to reason about the possible ordering of events in order to show by case analysis that the algorithm is correct.
+In my experience, this proof style is very error-prone, and it is not easy to make sure that no case was overlooked.
+I would prefer a proof based on inductive invariants, but that's a discussion that's off-topic for this post.
 
-Instead, I'd prefer a proof that exhibits an inductive invariant that implies safety.
-This is because we only have to consider a single step, instead of an entire execution, to check whether an invariant is inductive, and thus it's easier to not miss a case.
-For example, why Paxos is safe is crystal clear to me because, even though the algorithm may look more complex than Streamlet, Paxos has a simple inductive invariant that I can easily check.
+Instead, in this post, we will model the Streamlet algorithm in PlusCal/TLA+ and use the TLC model-checker to verify it's safety and liveness properties in small but non-trivial configurations.
+Moreover, the specification I present are also an example of how to use non-determinism to obtain simple specifications, and how to exploit the commutativity of actions to speed-up model-checking.
 
-My initial goal was to find an inductive invariant that implies Streamlet's safety, at which point I could really say that I understand Streamlet.
-To build up my intuition about the algorithm, I decided to model it in TLA+ and use the TLC model-checker to test various scenarios and putative (inductive and non-inductive) invariants.
+<!-- Even though Streamlet is concise, I think that understanding precisely why it works is not that simple. Moreover, the safety proof in the [original paper](https://eprint.iacr.org/2020/088.pdf) uses the operational reasoning style, where one considers an entire execution at once and one reasons about the possible ordering of events. -->
+<!-- In my experience, this style is very error-prone, and it's not easy to check that no case was overlooked. -->
 
-I haven't found an inductive invariant for Streamlet yet, and this post is about the modeling and model-checking Streamlet in TLA+.
-Maybe I'll find an inductive invariant  in the future and write about it.
+<!-- Instead, I'd prefer a proof that exhibits an inductive invariant that implies safety. -->
+<!-- This is because we only have to consider a single step, instead of an entire execution, to check whether an invariant is inductive, and thus it's easier to not miss a case. -->
+<!-- For example, why Paxos is safe is crystal clear to me because, even though the algorithm may look more complex than Streamlet, Paxos has a simple inductive invariant that I can easily check. -->
+
+<!-- My initial goal was to find an inductive invariant that implies Streamlet's safety, at which point I could really say that I understand Streamlet. -->
+<!-- To build up my intuition about the algorithm, I decided to model it in TLA+ and use the TLC model-checker to test various scenarios and putative (inductive and non-inductive) invariants. -->
+
+<!-- I haven't found an inductive invariant for Streamlet yet, and this post is about the modeling and model-checking Streamlet in TLA+. -->
+<!-- Maybe I'll find an inductive invariant in the future and write about it. -->
 
 ## Model-checking with TLC
 

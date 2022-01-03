@@ -164,10 +164,17 @@ In TLA+:
 ## First specification
 
 We start with a specification that makes use of non-determinism in order to eschew irrelevant details and capture the essence of how Streamlet ensures safety.
-The specification, appearing below and in `Streamlet.tla`, is very short.
+The specification, appearing below and in [`Streamlet.tla`](Streamlet.tla), is very short.
 With generous formatting, it consists of a mere 44 lines of PlusCal.
 
 ```
+CONSTANTS
+        P \* The set of processes
+    ,   Tx \* Transtaction sets (the payload in a block)
+    ,   MaxEpoch
+    ,   Quorum \* The set of quorums
+    ,   Leader(_) \* Leader(e) is the leader of epoch e
+
 1   --algorithm Streamlet {
 2       variables
 3           vote = [p \in P |-> {}], \* the vote cast by the processes,
@@ -281,7 +288,7 @@ This is because we express safety and liveness as state predicates, and, by our 
 Moreover, with a slightly more complex justification, we can also reorder the steps of different processes within the same epoch as long as the leader always takes the first step.
 This means that we can schedule processes completely deterministically, as in a sequential program, without loosing any reachable states.
 
-This is what we do in the specification `SequentializedStreamlet.tla`.
+This is what we do in the specification [`SequentializedStreamlet.tla`](SequentializedStreamlet.tla).
 There, we specify a scheduler that schedules all processes deterministically.
 The result is that the set of behaviors that the TLC model checker must explore is drastically reduced.
 For example, it takes only about 15 minutes to exhaustively explore all executions with 3 processes, 2 payloads, and 6 epochs; in contrast, it took about 4 hours and 20 minutes with the previous specification.

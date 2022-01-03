@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-	<name>SynchronousStreamlet</name>
+	<name>DetSchedStreamlet</name>
 	<comment></comment>
 	<projects>
 	</projects>
@@ -16,14 +16,9 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>Common.tla</name>
+			<name>DetSchedStreamlet.tla</name>
 			<type>1</type>
-			<location>/home/nano/Documents/streamlet/Common.tla</location>
-		</link>
-		<link>
-			<name>SynchronousStreamlet.tla</name>
-			<type>1</type>
-			<locationURI>PARENT-1-PROJECT_LOC/SynchronousStreamlet.tla</locationURI>
+			<locationURI>PARENT-1-PROJECT_LOC/DetSchedStreamlet.tla</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>

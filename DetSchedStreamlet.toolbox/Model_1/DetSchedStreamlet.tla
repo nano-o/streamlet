@@ -1,4 +1,4 @@
------------------------- MODULE SynchronousStreamlet ------------------------
+------------------------ MODULE DetSchedStreamlet ------------------------
 
 EXTENDS Sequences, FiniteSets, Integers
 
@@ -9,12 +9,6 @@ CONSTANTS
     ,   Quorum \* The set of quorums
     ,   GSE
     ,   Leader(_)
-    
-Num == \* assigns a process number to each process
-    CHOOSE f \in [P -> 1..Cardinality(P)] : 
-        \A p1,p2 \in P : p1 # p2 => f[p1] # f[p2]
-Proc(n) == \* the inverse of Num
-    CHOOSE p \in P : Num[p] = n
 
 (* 
 --algorithm Streamlet {
@@ -26,7 +20,6 @@ Proc(n) == \* the inverse of Num
         proposal = <<>>; \* the proposal of the leader for the current epoch
     define {
         E == 1..MaxEpoch
-        Max(X) == CHOOSE x \in X : \A y \in X : y <= x
         Genesis == <<>>
         Epoch(b) ==  \* the epoch of a block
             IF b = <<>> 
@@ -83,12 +76,11 @@ l1:     while (epoch \in E) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "55674737" /\ chksum(tla) = "e5a67733")
+\* BEGIN TRANSLATION (chksum(pcal) = "6b344639" /\ chksum(tla) = "e139fc96")
 VARIABLES height, votes, epoch, scheduled, proposal, pc
 
 (* define statement *)
 E == 1..MaxEpoch
-Max(X) == CHOOSE x \in X : \A y \in X : y <= x
 Genesis == <<>>
 Epoch(b) ==
     IF b = <<>>
@@ -196,5 +188,5 @@ BaitInv5 == \neg (
     
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 20:33:58 PST 2022 by nano
+\* Last modified Sun Jan 02 21:49:39 PST 2022 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

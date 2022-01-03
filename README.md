@@ -255,14 +255,14 @@ I believe that this is true in general, and that the bound of 5 proved in the St
 
 ### The deterministic-scheduler reduction
 
-Consider an execution of Streamlet and two steps `s1` and `s2` of two different processes `p1` and `p2` such that `s1` occurs right before `s2`, `s1` is a step of epoch `e1`, `s2` is a step of epoch `e2`, and `e2<e1`.
+Consider an execution `e` of Streamlet and two steps `s1` and `s2` of two different processes `p1` and `p2` such that `s1` occurs right before `s2`, `s1` is a step of epoch `e1`, `s2` is a step of epoch `e2`, and `e2<e1`.
 Note that the global state written by `s2` is never read by `s1` because a process in epoch `e1` only uses information from epoch smaller or equal to `e1`.
-Thus, we can swap `s1` and `s2`, obtaining an execution in which `s2` occurs right before `s1` and ending in exactly the same state.
+Moreover, if step `s2` can take place at some point in an execution, adding more steps of other processes epochs lower than `e2` before `s2` never prevents `s2` from taking place (i.e. the protocol is monotonic).
 
-Thus, we can reorder all steps in an execution `e1` to obtain a new execution `e2` in which all steps of epoch `1` happen first, then all steps of epoch 2, then all steps of epoch 3, etc.
+The previous paragraph shows that we can reorder all steps in an execution `e1` to obtain a new execution `e2` in which all steps of epoch `1` happen first, then all steps of epoch 2, then all steps of epoch 3, etc.
 Crucially, the end state of the system in `e1` and `e2` are the same.
-Thus, if we prove that all executions like `e2`, which we call synchronous, are safe and live, then we can conclude that all executions are safe and live.
-This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to synchronous executions does not change the set of reachable states.
+Thus, if we prove that all executions like `e2`, which we call epoch-by-epoch executions, are safe and live, then we can conclude that all executions are safe and live.
+This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to epoch-by-epoch executions does not change the set of reachable states.
 
 Moreover, with a slightly more complex justification, we can also reorder the steps of different processes within the same epoch as long as the leader always takes the first step.
 This means that we can schedule processes completely deterministically without loosing any reachable states.
@@ -273,7 +273,9 @@ The result is that the set of behaviors that the TLC model checker must explore 
 For example, it takes only about 15 minutes to exhaustively explore all executions with 3 processes, 2 payloads, and 6 epochs; in contrast, it took about 4 hours and 20 minutes with the previous specification.
 
 Note that this style of reduction is well-known and was used by [Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in 1984 in order to simplify reasoning about their algorithms.
-There is even a recent framework called [PSync](https://github.com/dzufferey/psync) that provides a programming language to develop consensus algorithms directly in a model similar to the deterministic-scheduler model and an efficient runtime system to deploy such algorithms.
+Several recent frameworks use this type of reduction to help engineers design and verify their algorithms.
+For example, [PSync](https://github.com/dzufferey/psync) provides a programming language to develop consensus algorithms directly in a model similar to the deterministic-scheduler model and an efficient runtime system to deploy such algorithms.
+We have taken a rather ad-hoc and informally justified approach to our epoch-by-epoch reduction of Streamlet. In contrast, methods such as [inductive sequentialization](https://bkragl.github.io/papers/pldi2020.pdf), supported by the [Civl verifier](https://civl-verifier.github.io/), offer a principled approach to applying such reductions.
 
 ### Expressing the liveness property
 
@@ -357,7 +359,9 @@ Omitting definitions that are the same as before, here is the specification of S
 I was able to exhaustively check the liveness property with 3 crash-stop processes, 2 block payloads, and 9 epochs among which the first 5 are asynchronous while the remaining 4 are synchronous (i.e. "GST" happens before epoch 6).
 
 As before, this was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC.
-It took about one hour to complete.
+It took one hour and four minutes to complete and found 320,821,303 distinct states for a depth of 29 steps.
+
+
 
 # Related work
 

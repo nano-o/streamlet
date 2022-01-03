@@ -73,7 +73,19 @@ The synchronizer approach is more robust than simply relying on clocks, and it i
 Surprisingly, it dates back to the [pioneering work of Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in the 1980s.
 For a recent treatment, see [Gotsman et al.](https://arxiv.org/abs/2008.04167).
 
-<!-- ## Example scenario -->
+## Example scenario
+
+The following drawing illustrates a possible blocktree built by the Streamlet algorithm.
+The tree vertices represent blocks with their epoch number and payloads omitted (we can assume that payloads are all different).
+A vertex with a circle around it represents a notarized block, while a vertex without a circle is a block that has been voted for by at least one process but is not notarized.
+The longest finalized blockchain is represented with full arrows, while other arrows are dotted.
+
+We can see that the block with epoch 2 is notarized, thus finalizing the block with epoch 1, but then the leader of epoch 3 did not notice that block 2 was notarized and instead extended the block with epoch 1 with a block with epoch 3. This cause a fork in the tree of notarized blocks, but not a fork in the finalized blockchain.
+Blocks with epoch number 3 and 4 in the finalized chain are final because of the notarized block with epoch 5.
+
+
+<!-- ![Possible blocktree produce by the Streamlet algorithm](blocktree.svg "A Streamlet blocktree") -->
+<img src="blocktree.svg" height="15%">
 
 <!-- For example, this is a possible scenario: -->
 <!-- * In epoch 1, the leader proposes `<< <<1, tx1>> >>` but not enough processes receive the proposal, and `<< <<1, tx1>> >>` is not notarized. -->

@@ -6,6 +6,8 @@
 ## Whitelist .gitignore
 !.gitignore
 
+!*.svg
+
 ## Whitelist TLA+ files
 !*.tla
 

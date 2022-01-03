@@ -8,6 +8,7 @@ CONSTANTS
     ,   MaxEpoch
     ,   Quorum \* The set of quorums
     ,   GSE
+    ,   Leader(_)
     
 Num == \* assigns a process number to each process
     CHOOSE f \in [P -> 1..Cardinality(P)] : 
@@ -18,10 +19,10 @@ Proc(n) == \* the inverse of Num
 (* 
 --algorithm Streamlet {
     variables
-        height = [p \in P |-> 0], \* height of the longest notarized chain seen by p
+        height = [p \in P |-> 0], \* height of the longest notarized p voted to extend
         votes = [p \in P |-> {}], \* the votes cast by the processes
         epoch = 1, \* the current epoch
-        n = 1, \* the next process to take a step
+        scheduled = {}, \* the processes that have been scheduled already in the current epoch
         proposal = <<>>; \* the proposal of the leader for the current epoch
     define {
         E == 1..MaxEpoch
@@ -39,6 +40,10 @@ Proc(n) == \* the inverse of Num
         Final(b) ==  
             /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
             /\  Epoch(Parent(b)) = Epoch(b)-1
+        NextProc == 
+            IF scheduled = {}
+            THEN CHOOSE p \in P : Leader(epoch) = p
+            ELSE CHOOSE p \in P : \neg p \in scheduled
         \* Safety property:
         Safety == \A b1,b2 \in {b \in Blocks : Final(b)} : 
             Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
@@ -48,44 +53,38 @@ Proc(n) == \* the inverse of Num
     process (scheduler \in {"sched"})
     {
 l1:     while (epoch \in E) {
-           if (n = 1) { \* we're starting the epoch, so pick a proposal
-                with (b \in Notarized) {
-                    \* after the first synchronous epoch, the leader is able to pick a notarized block with the highest height:
-                    when epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(b);
-                    with (tx \in Tx)
-                        proposal := Append(b, <<epoch,tx>>)
+            with (proc = NextProc) {
+                \* if proc is leader, make a proposal:
+                if (Leader(epoch) = proc)
+                    with (parent \in {b \in Notarized : height[proc] <= Len(b) /\ Epoch(b) <= epoch}, 
+                            tx \in Tx, b = Append(parent, <<epoch, tx>>)) {
+                        \* after the first synchronous epoch, the leader is able to pick a notarized block with the highest height:
+                        when epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(parent);
+                        proposal := b
+                    };
+                \* next, if possible, vote for the leader's proposal:
+                either if (height[proc] <= Len(proposal)-1) {
+                    votes[proc] := @ \cup {proposal};
+                    height[proc] := Len(proposal)-1
                 }
-            };
-            with (proc = Proc(n)) \* process number n takes a step
-            \* if possible, vote for the leader's proposal:
-            either {
-                with (maxLen \in height[proc]..Max({Len(b) : b \in Notarized})) { \* the max notarized length known to proc
-                    when epoch > GSE => \A b2 \in Notarized : Len(b2) <= maxLen;
-                    if (maxLen <= Len(proposal)-1) { \* vote if possible
-                        votes[proc] := @ \cup {proposal};
-                        height[proc] := Len(proposal)-1;
-                    }
-                    else 
-                        height[proc] := maxLen;
+                or {
+                    when epoch < GSE; \* Before GSE, we may miss the leader's proposal
+                    skip
+                };
+                \* go to the next epoch if all processes have been scheduled:
+                if (scheduled \cup {proc} = P) {
+                    scheduled := {};
+                    epoch := epoch+1
                 }
+                else 
+                    scheduled := scheduled \cup {proc}
             }
-            or {
-                when epoch < GSE; \* Before GSE, we may miss the leader's proposal
-                skip
-            };
-            \* now schedule the next process:
-            if (n = Cardinality(P)) {
-                n := 1;
-                epoch := epoch+1
-            }
-            else
-                n := n+1
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "6017577d" /\ chksum(tla) = "95b35990")
-VARIABLES height, votes, epoch, n, proposal, pc
+\* BEGIN TRANSLATION (chksum(pcal) = "55674737" /\ chksum(tla) = "e5a67733")
+VARIABLES height, votes, epoch, scheduled, proposal, pc
 
 (* define statement *)
 E == 1..MaxEpoch
@@ -103,6 +102,10 @@ Notarized == {Genesis} \cup
 Final(b) ==
     /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
     /\  Epoch(Parent(b)) = Epoch(b)-1
+NextProc ==
+    IF scheduled = {}
+    THEN CHOOSE p \in P : Leader(epoch) = p
+    ELSE CHOOSE p \in P : \neg p \in scheduled
 
 Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
     Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
@@ -110,7 +113,7 @@ Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
 Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
 
 
-vars == << height, votes, epoch, n, proposal, pc >>
+vars == << height, votes, epoch, scheduled, proposal, pc >>
 
 ProcSet == ({"sched"})
 
@@ -118,38 +121,38 @@ Init == (* Global variables *)
         /\ height = [p \in P |-> 0]
         /\ votes = [p \in P |-> {}]
         /\ epoch = 1
-        /\ n = 1
+        /\ scheduled = {}
         /\ proposal = <<>>
         /\ pc = [self \in ProcSet |-> "l1"]
 
 l1(self) == /\ pc[self] = "l1"
             /\ IF epoch \in E
-                  THEN /\ IF n = 1
-                             THEN /\ \E b \in Notarized:
-                                       /\ epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(b)
-                                       /\ \E tx \in Tx:
-                                            proposal' = Append(b, <<epoch,tx>>)
-                             ELSE /\ TRUE
-                                  /\ UNCHANGED proposal
-                       /\ LET proc == Proc(n) IN
-                            \/ /\ \E maxLen \in height[proc]..Max({Len(b) : b \in Notarized}):
-                                    /\ epoch > GSE => \A b2 \in Notarized : Len(b2) <= maxLen
-                                    /\ IF maxLen <= Len(proposal')-1
-                                          THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
-                                               /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
-                                          ELSE /\ height' = [height EXCEPT ![proc] = maxLen]
-                                               /\ votes' = votes
-                            \/ /\ epoch < GSE
-                               /\ TRUE
-                               /\ UNCHANGED <<height, votes>>
-                       /\ IF n = Cardinality(P)
-                             THEN /\ n' = 1
-                                  /\ epoch' = epoch+1
-                             ELSE /\ n' = n+1
-                                  /\ epoch' = epoch
+                  THEN /\ LET proc == NextProc IN
+                            /\ IF Leader(epoch) = proc
+                                  THEN /\ \E parent \in {b \in Notarized : height[proc] <= Len(b) /\ Epoch(b) <= epoch}:
+                                            \E tx \in Tx:
+                                              LET b == Append(parent, <<epoch, tx>>) IN
+                                                /\ epoch > GSE => \A b2 \in Notarized : Len(b2) <= Len(parent)
+                                                /\ proposal' = b
+                                  ELSE /\ TRUE
+                                       /\ UNCHANGED proposal
+                            /\ \/ /\ IF height[proc] <= Len(proposal')-1
+                                        THEN /\ votes' = [votes EXCEPT ![proc] = @ \cup {proposal'}]
+                                             /\ height' = [height EXCEPT ![proc] = Len(proposal')-1]
+                                        ELSE /\ TRUE
+                                             /\ UNCHANGED << height, votes >>
+                               \/ /\ epoch < GSE
+                                  /\ TRUE
+                                  /\ UNCHANGED <<height, votes>>
+                            /\ IF scheduled \cup {proc} = P
+                                  THEN /\ scheduled' = {}
+                                       /\ epoch' = epoch+1
+                                  ELSE /\ scheduled' = (scheduled \cup {proc})
+                                       /\ epoch' = epoch
                        /\ pc' = [pc EXCEPT ![self] = "l1"]
                   ELSE /\ pc' = [pc EXCEPT ![self] = "Done"]
-                       /\ UNCHANGED << height, votes, epoch, n, proposal >>
+                       /\ UNCHANGED << height, votes, epoch, scheduled, 
+                                       proposal >>
 
 scheduler(self) == l1(self)
 
@@ -193,5 +196,5 @@ BaitInv5 == \neg (
     
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 18:07:13 PST 2022 by nano
+\* Last modified Sun Jan 02 20:33:58 PST 2022 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

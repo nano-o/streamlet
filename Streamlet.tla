@@ -40,7 +40,7 @@ CONSTANTS
     }
     process (proc \in P)
         variables 
-            height = 0, \* height of the longest notarized chain seen by p
+            height = 0, \* height of the longest notarized chain that p voted to extend
             epoch = 1; \* the current epoch of p
     {
 l1:     while (epoch \in E) {
@@ -144,5 +144,5 @@ BaitInv2 == \neg (\E b1,b2 \in Notarized : Final(b2) /\ \neg Compatible(b1, b2))
 BaitInv3 == \neg (\E b \in Notarized : Final(b) /\ Epoch(b) # Epoch(SubSeq(b,1,1))+Len(b)-1)
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 15:58:58 PST 2022 by nano
+\* Last modified Sun Jan 02 20:01:23 PST 2022 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

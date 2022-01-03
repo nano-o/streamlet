@@ -141,7 +141,7 @@ For example, this is a block in TLA+ notation:
 This TLA+ block models a real block consisting of epoch 4, payload `tx4`, and the hash of a previous block with epoch 3, payload `tx3`, and a hash of a previous block with epoch 1, payload `tx1`, and the hash of the genesis block.
 
 In this model of blocks, a block tree is a prefix-closed set of blocks, and a blockchain is a block tree without branching.
-Moreover, extending a block `b` jeans appending an epoch-payload tuple to the block `b`.
+Moreover, we can extend a block `b` just by appending an epoch-payload tuple to it.
 Finally, the genesis block is the empty sequence `<<>>`.
 
 We now define the epoch of a block `b` as `0` if `b` is the genesis block and otherwise as the epoch found in the last tuple in `b`.

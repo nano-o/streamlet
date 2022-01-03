@@ -1,4 +1,4 @@
------------------------- MODULE DetSchedStreamlet ------------------------
+------------------------ MODULE SequentializedStreamlet ------------------------
 
 EXTENDS Sequences, FiniteSets, Integers
 
@@ -188,5 +188,5 @@ BaitInv5 == \neg (
     
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 21:49:39 PST 2022 by nano
+\* Last modified Mon Jan 03 06:56:00 PST 2022 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

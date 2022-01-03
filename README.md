@@ -261,13 +261,13 @@ Moreover, if step `s2` can take place at some point in an execution, adding more
 
 The previous paragraph shows that we can reorder all steps in an execution `e1` to obtain a new execution `e2` in which all steps of epoch `1` happen first, then all steps of epoch 2, then all steps of epoch 3, etc.
 Crucially, the end state of the system in `e1` and `e2` are the same.
-Thus, if we prove that all executions like `e2`, which we call epoch-by-epoch executions, are safe and live, then we can conclude that all executions are safe and live.
-This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to epoch-by-epoch executions does not change the set of reachable states.
+Thus, if we prove that all executions like `e2`, which we call sequentialized executions, are safe and live, then we can conclude that all executions are safe and live.
+This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to sequentialized executions does not change the set of reachable states.
 
 Moreover, with a slightly more complex justification, we can also reorder the steps of different processes within the same epoch as long as the leader always takes the first step.
 This means that we can schedule processes completely deterministically without loosing any reachable states.
 
-This is what we do in the specification `DetSchedStreamlet.tla`.
+This is what we do in the specification `SequentializedStreamlet.tla`.
 There, we specify a scheduler that schedules all processes deterministically.
 The result is that the set of behaviors that the TLC model checker must explore is drastically reduced.
 For example, it takes only about 15 minutes to exhaustively explore all executions with 3 processes, 2 payloads, and 6 epochs; in contrast, it took about 4 hours and 20 minutes with the previous specification.
@@ -275,7 +275,7 @@ For example, it takes only about 15 minutes to exhaustively explore all executio
 Note that this style of reduction is well-known and was used by [Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in 1984 in order to simplify reasoning about their algorithms.
 Several recent frameworks use this type of reduction to help engineers design and verify their algorithms.
 For example, [PSync](https://github.com/dzufferey/psync) provides a programming language to develop consensus algorithms directly in a model similar to the deterministic-scheduler model and an efficient runtime system to deploy such algorithms.
-We have taken a rather ad-hoc and informally justified approach to our epoch-by-epoch reduction of Streamlet. In contrast, methods such as [inductive sequentialization](https://bkragl.github.io/papers/pldi2020.pdf), supported by the [Civl verifier](https://civl-verifier.github.io/), offer a principled approach to applying such reductions.
+We have taken a rather ad-hoc and informally justified approach to our sequentialization of Streamlet. In contrast, methods such as [inductive sequentialization](https://bkragl.github.io/papers/pldi2020.pdf), supported by the [Civl verifier](https://civl-verifier.github.io/), offer a principled approach to applying such reductions.
 
 ### Expressing the liveness property
 

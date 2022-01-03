@@ -13,7 +13,7 @@ I would prefer a proof based on inductive invariants, but that's a discussion th
 Instead, in this post, we will specify the Streamlet algorithm in PlusCal/TLA+ and use the TLC model-checker to verify it's safety and liveness properties in small but non-trivial configurations.
 Moreover, the specification I present are also an example of:
 - how to use non-determinism to obtain simple specifications
-- how to exploit the commutativity of actions to speed-up model-checking by drastically reducing the number of executions to check.
+- how to exploit the commutativity of actions to speed-up model-checking by sequentializing the specification.
 
 <!-- Even though Streamlet is concise, I think that understanding precisely why it works is not that simple. Moreover, the safety proof in the [original paper](https://eprint.iacr.org/2020/088.pdf) uses the operational reasoning style, where one considers an entire execution at once and one reasons about the possible ordering of events. -->
 <!-- In my experience, this style is very error-prone, and it's not easy to check that no case was overlooked. -->
@@ -251,7 +251,7 @@ This was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB
 I think this is an interesting configuration because we have multiple quorums (sets of 2 processes at least), branching even within a single epoch (because of the 2 payloads), and enough epochs to obtain finalized chains containing non-consecutive epoch numbers and having notarized but non-final branches.
 Thus, the model-checking results give me high confidence that the Streamlet algorithm is indeed safe.
 
-## Liveness and the deterministic-scheduler reduction
+## Liveness and sequentialization
 
 To model-check the liveness property of Streamlet, we must modify our specification and introduce synchronous epochs.
 Moreover, we'll need to be able to exhaustively model-check the specification for more than 6 epochs to get meaningful results.
@@ -265,7 +265,7 @@ This is very effective and will allow us to exhaustively check that, even after 
 In fact, we'll see that it only takes 4 synchronous epoch for a new block to be finalized.
 I believe that this is true in general, and that the bound of 5 proved in the Streamlet paper is overly conservative.
 
-### The deterministic-scheduler reduction
+### Sequentialization
 
 Consider an execution `e` of Streamlet and two steps `s1` and `s2` of two different processes `p1` and `p2` such that `s1` occurs right before `s2`, `s1` is a step of epoch `e1`, `s2` is a step of epoch `e2`, and `e2<e1`.
 Note that the global state written by `s2` is never read by `s1` because a process in epoch `e1` only uses information from epoch smaller or equal to `e1`.
@@ -277,7 +277,7 @@ Thus, if we prove that all executions like `e2`, which we call sequentialized ex
 This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to sequentialized executions does not change the set of reachable states.
 
 Moreover, with a slightly more complex justification, we can also reorder the steps of different processes within the same epoch as long as the leader always takes the first step.
-This means that we can schedule processes completely deterministically without loosing any reachable states.
+This means that we can schedule processes completely deterministically, as in a sequential program, without loosing any reachable states.
 
 This is what we do in the specification `SequentializedStreamlet.tla`.
 There, we specify a scheduler that schedules all processes deterministically.
@@ -286,7 +286,7 @@ For example, it takes only about 15 minutes to exhaustively explore all executio
 
 Note that this style of reduction is well-known and was used by [Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in 1984 in order to simplify reasoning about their algorithms.
 Several recent frameworks use this type of reduction to help engineers design and verify their algorithms.
-For example, [PSync](https://github.com/dzufferey/psync) provides a programming language to develop consensus algorithms directly in a model similar to the deterministic-scheduler model and an efficient runtime system to deploy such algorithms.
+For example, [PSync](https://github.com/dzufferey/psync) provides a programming language to develop consensus algorithms directly in a model somewhat similar to the sequential model we used, and an efficient runtime system to deploy such algorithms.
 We have taken a rather ad-hoc and informally justified approach to our sequentialization of Streamlet. In contrast, methods such as [inductive sequentialization](https://bkragl.github.io/papers/pldi2020.pdf), supported by the [Civl verifier](https://civl-verifier.github.io/), offer a principled approach to applying such reductions.
 
 ### Expressing the liveness property
@@ -312,9 +312,9 @@ The answer is that we want to show that a _new_ block, i.e. a block which was no
 It is easy to see that, when `GSE` starts, no block with an epoch greater or equal to `e-1` can be final when epoch `e` starts.
 Thus, any final block with an epoch greater or equal to `GSE-1` was not final when epoch `GSE` started and can be considered "new".
 
-### The deterministic-scheduler specification with liveness
+### The sequentialized specification with liveness
 
-Omitting definitions that are the same as before, here is the specification of Streamlet in the deterministic-scheduler model:
+Omitting definitions that are the same as before, here is the sequentialized specification of Streamlet:
 
 ```
 1   --algorithm Streamlet {

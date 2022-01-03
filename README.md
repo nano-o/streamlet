@@ -64,6 +64,10 @@ Each epoch `e` has a unique, pre-determined leader (e.g. process `(e mod N)+1`),
 - A block is notarized when it has gathered votes from a quorum in the same epoch, and a chain is notarized when all its blocks, except the genesis block, are notarized.
 - When a notarized chain includes three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second of those 3 blocks is considered final.
 
+In practice, a process may switch epoch using a real-time clock (e.g. each epoch lasting 5 seconds), or processes may use a synchronizer sub-protocol.
+This later approach is employed by many deployed protocols and dates back to the [pioneering work of Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in the 1980s.
+For a recent treatment, see [Gotsman et al.](https://arxiv.org/abs/2008.04167).
+
 For example, this is a possible scenario:
 * In epoch 1, the leader proposes `<< <<1, tx1>> >>` but not enough processes receive the proposal, and `<< <<1, tx1>> >>` is not notarized.
 * In epoch 2, the leader proposes `<< <<2, tx2>> >>` and `<< <<2, tx1>> >>` is notarized.

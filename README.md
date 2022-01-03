@@ -355,8 +355,9 @@ Omitting definitions that are the same as before, here is the specification of S
 ### Model-checking results
 
 I was able to exhaustively check the liveness property with 3 crash-stop processes, 2 block payloads, and 9 epochs among which the first 5 are asynchronous while the remaining 4 are synchronous (i.e. "GST" happens before epoch 6).
-As before, this was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC. 
-It took about TODO minutes.
+
+As before, this was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC.
+It took about one hour to complete.
 
 # Related work
 

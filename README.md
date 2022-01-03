@@ -102,20 +102,22 @@ Blocks with epoch number 3 and 4 in the finalized chain are final because of the
 The algorithm guarantees that if two chains are final, then one is a prefix of the other.
 This is the consistency property of the algorithm.
 
-Note that the consistency guarantee holds even if processes proceed through epoch at different speeds and may not be in the same epoch at the same time.
+Note that the consistency guarantee holds even if processes proceed through epochs at different speeds and may not be in the same epoch at the same time.
 
 ## Liveness guarantee
 
 In an asynchronous network, Streamlet cannot guarantee that a block will ever get finalized.
 This is because the consensus problem is famously unsolvable in an asynchronous network.
 Instead, to guarantee liveness properties, we must make additional assumptions.
-To do so, first define a synchronous epoch as an epoch in which all non-faulty processes receive each others messages before the end of the epoch, and in which the leader is not faulty.
+To do so, first define a synchronous epoch as an epoch in which all non-faulty processes receive each other's messages before the end of the epoch, and in which the leader is not faulty.
 
 We can now state Streamlet's liveness guarantee:
 The Streamlet algorithm guarantees that, after 4 consecutive synchronous epochs, a new blocks gets finalized.
-Note that, according to the usual definitions of liveness and safety used in the academic field of distributed computing, this is a safety property (because it can be violated in a bounded execution); but we'll call it liveness anyway.
 
-Note that the original paper proves that we need 5 synchronous epochs with no failures to guarantee finalizing one more block, but I believe this is overly conservative and that 4 epochs suffice. Moreover, we will see that a small tweak allows to get this down to 3.
+Note that, according to the usual definitions of liveness and safety used in the academic field of distributed computing, this is a safety property because it can be violated in a bounded execution.
+But, as in the Streamlet paper, we'll call it liveness anyway.
+
+Note that the Streamlet paper proves that we need 5 synchronous epochs to guarantee finalizing one more block, but I believe this is overly conservative and that 4 epochs suffice.
 
 # Streamlet in PlusCal/TLA+
 

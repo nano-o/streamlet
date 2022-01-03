@@ -26,21 +26,20 @@ Moreover, the specification I present are also an example of how to use non-dete
 <!-- I haven't found an inductive invariant for Streamlet yet, and this post is about the modeling and model-checking Streamlet in TLA+. -->
 <!-- Maybe I'll find an inductive invariant in the future and write about it. -->
 
-## Model-checking with TLC
+## Model-checking results
 
-The TLC model-checker is an explicit-state model checker, which means that it can only handle fixed configurations (e.g. 3 processes, 5 epochs, etc.)
-Moreover, TLC suffers from the state-explosion problem, where model-checking even small configurations quickly becomes intractable as the configuration size increases.
+<!-- The TLC model-checker is an explicit-state model checker, which means that it can only handle fixed configurations (e.g. 3 processes, 5 epochs, etc.) -->
+<!-- The biggest challenge when using TLC is the state-explosion problem, where model-checking even small configurations quickly becomes intractable as the configuration size increases. -->
 
-To enable TLC to check the safety and liveness of Streamlet in interesting configurations, I abstracted over several aspects of Streamlet (e.g. there is no network in my model).
-I believe that the abstractions I made are sound, i.e. they do not remove any behaviors, but I have not checked that mechanically.
-Finally, I have also applied a reduction base on commutativity to soundly and drastically restrict the number of behaviors that TLC has to explore.
+<!-- To enable TLC to check the safety and liveness of Streamlet in interesting configurations, I abstracted over several aspects of Streamlet (e.g. there is no network in my model). -->
+<!-- I believe that the abstractions I made are sound, i.e. they do not remove any behaviors, but I have not checked that mechanically. -->
+<!-- Finally, I have also applied a reduction base on commutativity to soundly and drastically restrict the number of behaviors that TLC has to explore. -->
 
-TODO: the model is in-between crash-stop and Byzantine: in asynchronous rounds, the leader can issue malicious proposals.
+<!-- TODO: the model is in-between crash-stop and Byzantine: in asynchronous rounds, the leader can issue malicious proposals. -->
 
-I was able to exhaustively check the safety and liveness properties of Streamlet in interesting configurations:
-* with 3 crash-stop processes, 2 block payloads, and 5 asynchronous epochs;
-* with 3 crash-stop processes, 2 block payloads, and 8 epochs among which the first 3 are asynchronous while the remaining 5 are synchronous (i.e. "GST" happens before epoch 4).
-Even though I haven't found an inductive invariant, this gives my very high confidence that Streamlet is correct.
+I was able to exhaustively check the safety and liveness properties of (crash-stop) Streamlet in interesting configurations:
+* with 3 crash-stop processes, 2 block payloads, and 6 asynchronous epochs;
+* with 3 crash-stop processes, 2 block payloads, and 9 epochs among which the first 4 are asynchronous while the remaining 5 are synchronous (i.e. "GST" happens before epoch 4).
 
 We'll also see that, with a small modification to the algorithm, we can guarantee that a new block gets finalized in 4 synchronous rounds (instead of 5 for the original algorithm).
 
@@ -50,10 +49,9 @@ The goal of the Streamlet algorithm is to enable a fixed set of `N` processes in
 Although many such algorithms existed before Streamlet, Streamlet is striking because of the simplicity of the rules that processes must follow.
 
 Streamlet can tolerate malicious, Byzantine processes, but, to simplify things, here we consider only crash-stop faults and we assume that, in every execution, a strict majority of the processes do not fail.
-However, we abstract the proposal process in such a way as to model Byzantine proposals which, in my opinion, captures the worst that Byzantine processes can do.
 As is customary, we refer to a strict majority as a quorum.
 
-The protocol evolves in consecutive epochs (1,2,3,...) during which processes vote for blocks according to the rules below.
+The protocol evolves in consecutive epochs numbered 1,2,3,... during which processes vote for blocks according to the rules below.
 A block consists of a hash of a previous block, an epoch number, and a payload (e.g. a set of transactions); moreover, a special, unique genesis block has epoch number 0.
 
 A set of blocks forms a directed graph such that `(b1,b2)` is an edge if and only if `b2` contains the hash of block `b1`.
@@ -61,9 +59,9 @@ We say that a set of blocks forms a valid block tree when the directed graph for
 A valid blockchain (or simply a chain for short) is a valid block tree in which every process has at most one successor, i.e. in which there are not forks.
 
 Each epoch `e` has a unique, pre-determined leader (e.g. process `(e mod N)+1`), and processes in epoch e must follow the following rules:
-- The leader proposes a new block with epoch number e that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
-- Every process votes for the leader's proposal as long as the proposal extends one of the longest notarized chains that the process knows of.
-- A block is notarized when it has gathered votes from a quorum in the same epoch, and a chain is notarized when all its blocks (except the genesis block) are.
+- The leader proposes a new block with epoch number `e` that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
+- Every process votes for the leader's proposal as long as the proposal is longer than the longest notarized chains that the process knows of.
+- A block is notarized when it has gathered votes from a quorum in the same epoch, and a chain is notarized when all its blocks, except the genesis block, are notarized.
 - When a notarized chain includes three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second of those 3 blocks is considered final.
 
 For example, this is a possible scenario:
@@ -85,12 +83,15 @@ Note that the consistency guarantee holds even if processes proceed through epoc
 
 ## Liveness guarantee
 
+In an asynchronous network, Streamlet cannot guarantee that a block will ever get finalized.
+This is because the consensus problem is famously unsolvable in an asynchronous network.
+Instead, to guarantee liveness properties, we must make additional assumptions.
+To do so, first define a synchronous epoch as an epoch in which all non-faulty processes receive each others messages before the end of the epoch, and in which the leader is not faulty.
+
+We can now state Streamlet's liveness guarantee:
 The Streamlet algorithm guarantees that, after 4 consecutive synchronous epochs, a new blocks gets finalized.
-This is the liveness property of the algorithm.
 
-A synchronous epoch is an epoch in which all non-faulty processes receive each others messages before the end of the epoch, and in which the leader is not faulty.
-
-Note that the original papers proves that we need 5 synchronous epochs with no failures to guarantee finalizing one more block, but I believe this is overly conservative and that 4 epochs suffice. Moreover, we will see that a small tweak allows to get this down to 3.
+Note that the original paper proves that we need 5 synchronous epochs with no failures to guarantee finalizing one more block, but I believe this is overly conservative and that 4 epochs suffice. Moreover, we will see that a small tweak allows to get this down to 3.
 
 # Streamlet in PlusCal/TLA+
 
@@ -104,6 +105,14 @@ Thus, assuming that there are no hash collisions, a block uniquely determines al
 To model this situation, we could model a block as a recursive data structure containing its parent.
 However, to make things simpler, we model a block as a sequence of pairs, each containing an epoch and a payload.
 No information is lost in the process: in both cases, a block determines a unique sequence of epoch-payload pairs.
+
+For example, this is a block in TLA+ notation:
+
+```
+<< <<1, tx1>>, <<3, tx3>>, <<4,tx4>> >>
+```
+
+This TLA+ block models a real block consisting of epoch 4, payload `tx4`, and the hash of a previous block with epoch 3, payload `tx3`, and a hash of a previous block with epoch 1, payload `tx1`, and the hash of the genesis block.
 
 In this model of blocks, a block tree is a prefix-closed set of blocks, and a blockchain is a block tree without branching.
 Moreover, extending a block `b` jeans appending an epoch-payload tuple to the block `b`.
@@ -213,27 +222,56 @@ Finally, line 41, `self` goes to the next epoch.
 ### Model-checking results
 
 With TLC, I was able to exhaustively model-check that the `Safety` property holds for 3 processes, 2 payloads, and 6 epochs.
-This was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC, and it took about 4 hours.
+This was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC, and it took about 4 hours and 20 minutes.
 
 I think this is an interesting configuration because we have multiple quorums (sets of 2 processes at least), branching even within a single epoch (because of the 2 payloads), and enough epochs to obtain finalized chains containing non-consecutive epoch numbers and having notarized but non-final branches.
 Thus, the model-checking results give me high confidence that the Streamlet algorithm is indeed safe.
 
 ## Liveness and synchronous reduction
 
-We exploit commutativity to reorder actions in a canonical order.
+To model-check the liveness property of Streamlet, we must modify our model and introduce synchronous epochs.
+Moreover, we'll need to be able to exhaustively model-check the specification for more than 6 epochs to get meaningful results.
+This is because the liveness property is that a new block must be decided after 5 synchronous epochs.
+To truly test this claim, we need to check that it holds even after a few asynchronous epochs have had the chance to wreak as much havoc as possible.
 
-# Liveness
+As we will next see, we can take advantage of the commutativity of some steps in the protocol to reduce the problem to checking only a restricted set of canonical execution.
+This will allow us to exhaustively check with TLC that even after 4 totally asynchronous epochs, Streamlet guarantees that a new block is finalized after 5 synchronous epochs.
+In fact, we'll see that it only takes 4 synchronous epoch for a new block to be finalized.
+I believe that this is true in general, and the bound of 5 proved in the Streamlet paper is overly conservative.
 
-We assume that epoch `GSE` (for global synchronization epoch)  and all epochs after are synchronous.
-In a synchronous epoch, the leader follows the algorithm, every node receives the leader's proposal, and every node receives all the votes of the other nodes (even votes cast in previous epochs).
-This is reflected as follows in the TLA+ model:
-* In epoch `GSE` and after, nodes vote for the leader's proposal.
-* In epoch `GSE`, the leader makes a proposal, but it doesn't necessarily extend a longest notarized chain.
-  This is because, at the time of making the proposal, the leader may not have received all previous votes yet.
+### The synchronous reduction
+
+Consider an execution of Streamlet and two steps `s1` and `s2` of two different processes `p1` and `p2` such that `s1` occurs right before `s2`, `s1` is a step of epoch `e1`, `s2` is a step of epoch `e2`, and `e2<e1`.
+Note that the global state written by `s2` is never read by `s1` because a process in epoch `e1` only uses information from epoch smaller or equal to `e1`.
+Thus, we can swap `s1` and `s2`, obtaining an execution in which `s2` occurs right before `s1` and ending in exactly the same state.
+
+Thus, we can reorder all actions in an execution `e1` to obtain a new execution `e2` in which all actions of epoch `1` happen first, then all actions of epoch 2, then all actions of epoch 3, etc.
+Crucially, the end state of the system in `e1` and `e2` are the same.
+Thus, if we prove that all executions like `e2`, which we call synchronous, are safe and live, then we can conclude that all executions are safe and live.
+This is because we express safety and liveness as state predicates, and, by our crucial observation above, restricting ourselves to synchronous executions does not change the set of reachable states.
+
+Moreover, with slightly more complex reasoning (because of leader proposals), it turns out that we can also reorder the actions of different processes within the same epoch as long as the leader always takes the first action.
+This means that we can schedule processes completely deterministically without loosing any reachable states.
+
+This is what we do in the specification `SynchronousStreamlet.tla`.
+There, we model a scheduler that schedules all processes deterministically.
+The result is that the set of behaviors that the TLC model checker must explore is drastically reduced.
+For example, it takes only about 20 minutes to exhaustively explorer all executions with 3 processes, 2 payloads, and 6 epochs; in contrast, it took about 4 hours and 20 minutes with the previous specification.
+
+### Expressing the liveness property
+
+To check the liveness property, we introduce a constant `GSE` (for global synchronization epoch) and we add constraints in the actions that model the fact that all epoch including and after `GSE` are synchronous.
+In a synchronous epoch, every node receives the leader's proposal and every node receives all the votes of the other nodes (even votes cast in previous epochs).
+This is reflected as follows in the PlusCal/TLA+ model:
+* In epoch `GSE` and after, nodes do not skip the epoch and vote for the leader's proposal if the proposal is longer than the longest chain that the node has ever voted to extend.
+* In epoch `GSE`, the leader makes a proposal, but the proposal doesn't necessarily extend a longest notarized chain because, even though the leader must receive all previous votes by the end of epoch `GSE`, it might not yet have by the time it makes its proposal.
 * In epoch `GSE+1` and above, the leader proposes to extend one of the longest notarized chains.
 
-# Remarks
+### Model-checking results
 
-[The excellent model written by Murat](https://github.com/muratdem/PlusCal-examples/blob/master/Streamlet/str0.tla) and [described in his blog](https://muratbuffalo.blogspot.com/2020/07/modeling-streamlet-in-tla.html) uses a shared-whiteboard model of messages in which all processes learn about a new notarized chain atomically.
-In contrast, in the model of the present post, processes independently learn about new notarized chains.
-Thus, I think that the model of this post more faithfully represents what can happen in an asynchronous system.
+# Related work
+
+[The excellent model written by Murat](https://github.com/muratdem/PlusCal-examples/blob/master/Streamlet/str0.tla) and [described in his blog](https://muratbuffalo.blogspot.com/2020/07/modeling-streamlet-in-tla.html) uses a shared-whiteboard model of messages in which all processes receive a given message at the same time, which means that they always have the same view of the system.
+The model of Murat therefore does not capture all possible behaviors of the Streamlet algorithm.
+
+In contrast, models of the present post reflect the fact that processes have different, partial views of what blocks have been notarized or not.

@@ -26,19 +26,14 @@ Proc(n) == \* the inverse of Num
     define {
         E == 1..MaxEpoch
         Max(X) == CHOOSE x \in X : \A y \in X : y <= x
-        Root == <<>>
+        Genesis == <<>>
         Epoch(b) ==  \* the epoch of a block
             IF b = <<>> 
             THEN 0 \* note how the root is by convention a block with epoch 0
             ELSE b[Len(b)][1]
-        Parent(b) == IF Len(b) = 1 THEN Root ELSE SubSeq(b, 1, Len(b)-1) \* the parent of a block
-        Prefix(b1, b2) ==
-            /\  Len(b1) <= Len(b2)
-            /\  \/  b1 = Root
-                \/  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
-        Compatible(b1, b2) == Prefix(b1, b2) \/ Prefix(b2, b1)
+        Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1) \* the parent of a block
         Blocks == UNION {votes[p] : p \in P}
-        Notarized == {Root} \cup \* Root is considered notarized by default 
+        Notarized == {Genesis} \cup \* Genesis is considered notarized by default 
             { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in votes[p] }
         \* Final blocks:
         Final(b) ==  
@@ -49,12 +44,6 @@ Proc(n) == \* the inverse of Num
             Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
         \* Liveness property; it takes at most 4 epochs to finalize a new block: 
         Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
-        \* Invariants:
-        Inv1 == \A b \in Blocks : Final(b) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
-        Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ b2 \in Notarized /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
-        Inv3 == \A b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
-        Inv4 == \A b \in Blocks : b \in Notarized /\ (\E tx \in Tx : Append(b, <<Epoch(b)+1, tx>>)) \in Notarized 
-                    => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
     }
     process (scheduler \in {"sched"})
     {
@@ -95,25 +84,20 @@ l1:     while (epoch \in E) {
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "690fe5e5" /\ chksum(tla) = "6d41a688")
+\* BEGIN TRANSLATION (chksum(pcal) = "6017577d" /\ chksum(tla) = "95b35990")
 VARIABLES height, votes, epoch, n, proposal, pc
 
 (* define statement *)
 E == 1..MaxEpoch
 Max(X) == CHOOSE x \in X : \A y \in X : y <= x
-Root == <<>>
+Genesis == <<>>
 Epoch(b) ==
     IF b = <<>>
     THEN 0
     ELSE b[Len(b)][1]
-Parent(b) == IF Len(b) = 1 THEN Root ELSE SubSeq(b, 1, Len(b)-1)
-Prefix(b1, b2) ==
-    /\  Len(b1) <= Len(b2)
-    /\  \/  b1 = Root
-        \/  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
-Compatible(b1, b2) == Prefix(b1, b2) \/ Prefix(b2, b1)
+Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1)
 Blocks == UNION {votes[p] : p \in P}
-Notarized == {Root} \cup
+Notarized == {Genesis} \cup
     { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in votes[p] }
 
 Final(b) ==
@@ -124,12 +108,6 @@ Safety == \A b1,b2 \in {b \in Blocks : Final(b)} :
     Len(b1) <= Len(b2) => b1 = SubSeq(b2, 1, Len(b1))
 
 Liveness == (epoch = GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE-1
-
-Inv1 == \A b \in Blocks : Final(b) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
-Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ b2 \in Notarized /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
-Inv3 == \A b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
-Inv4 == \A b \in Blocks : b \in Notarized /\ (\E tx \in Tx : Append(b, <<Epoch(b)+1, tx>>)) \in Notarized
-            => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
 
 
 vars == << height, votes, epoch, n, proposal, pc >>
@@ -188,8 +166,22 @@ Termination == <>(\A self \in ProcSet: pc[self] = "Done")
 
 \* END TRANSLATION 
 
+Prefix(b1, b2) ==
+    /\  Len(b1) <= Len(b2)
+    /\  \/  b1 = Genesis
+        \/  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
+Compatible(b1, b2) == Prefix(b1, b2) \/ Prefix(b2, b1)
+
+\* Invariants:
+Inv1 == \A b \in Blocks : Final(b) => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
+Inv2 == \A b1,b2 \in Blocks : Final(b1) /\ b2 \in Notarized /\ Len(b2) >= Len(b1) => b1 = SubSeq(b2, 1, Len(b1))
+Inv3 == \A b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Epoch(b1) < Epoch(b2) => Len(b1) <= Len(b2)
+Inv4 == \A b \in Blocks : b \in Notarized /\ (\E tx \in Tx : Append(b, <<Epoch(b)+1, tx>>)) \in Notarized 
+            => \E Q \in Quorum : \A p \in Q : height[p] >= Len(b)
+                    
 \* The tip of a notarized chain:
 Tip(b) == b \in Notarized /\ \A b2 \in Blocks: b # b2 /\ Prefix(b,b2) => \neg b2 \in Notarized
+
 BaitInv1 == \A b \in Blocks : \neg Final(b)
 BaitInv2 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Final(b2) /\ \neg Compatible(b1, b2))
 BaitInv3 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ Len(b1) = 2 /\ proposal = b2 /\ \neg Compatible(b1,b2))
@@ -197,7 +189,9 @@ BaitInv4 == \neg (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ 
 BaitInv5 == \neg (
     (\E b1,b2 \in Blocks : b1 \in Notarized /\ b2 \in Notarized /\ Len(b1) = 2 /\ Len(b2) = 2 /\ \neg Compatible(b1,b2) /\ \neg Compatible(SubSeq(b1,1,1),SubSeq(b2,1,1)))
     /\ epoch = 6 /\ \A b \in Blocks : b \in Notarized => Epoch(b) # 5 )
+    
+    
 =============================================================================
 \* Modification History
-\* Last modified Sun Jan 02 14:49:47 PST 2022 by nano
+\* Last modified Sun Jan 02 18:07:13 PST 2022 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

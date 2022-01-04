@@ -43,6 +43,8 @@ I was able to exhaustively check the safety and liveness properties of (crash-st
 * with 3 crash-stop processes, 2 block payloads, and 7 asynchronous epochs;
 * with 3 crash-stop processes, 2 block payloads, and 5 asynchronous epochs followed by 4 synchronous epochs (i.e. "GST" happens before epoch 6).
 
+Those results give me very high confidence that streamlet satisfies its claimed properties.
+
 We'll also see that TLC verifies that, in all configurations checked, Streamlet guarantees that a new block gets finalized in 4 synchronous rounds.
 This is better than the bound of 5 rounds proved in the Streamlet paper, and I believe that a bound of 4 holds in general.
 

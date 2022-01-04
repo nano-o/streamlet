@@ -40,8 +40,8 @@ Moreover, the specification I present are also an example of:
 <!-- TODO: the model is in-between crash-stop and Byzantine: in asynchronous rounds, the leader can issue malicious proposals. -->
 
 I was able to exhaustively check the safety and liveness properties of (crash-stop) Streamlet in interesting configurations:
-* with 3 crash-stop processes, 2 block payloads, and 6 asynchronous epochs;
-* with 3 crash-stop processes, 2 block payloads, and 9 epochs among which the first 5 are asynchronous while the remaining 4 are synchronous (i.e. "GST" happens before epoch 6).
+* with 3 crash-stop processes, 2 block payloads, and 7 asynchronous epochs;
+* with 3 crash-stop processes, 2 block payloads, and 5 asynchronous epochs followed by 4 synchronous epochs (i.e. "GST" happens before epoch 6).
 
 We'll also see that TLC verifies that, in all configurations checked, Streamlet guarantees that a new block gets finalized in 4 synchronous rounds.
 This is better than the bound of 5 rounds proved in the Streamlet paper, and I believe that a bound of 4 holds in general.
@@ -379,8 +379,11 @@ Omitting definitions that are the same as before, here is the sequentialized spe
 
 I was able to exhaustively check the liveness property with 3 crash-stop processes, 2 block payloads, and 9 epochs among which the first 5 are asynchronous while the remaining 4 are synchronous (i.e. "GST" happens before epoch 6).
 
-As before, this was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory allocated to TLC.
-It took one hour and four minutes to complete and found 320,821,303 distinct states for a depth of 29 steps.
+As before, this was done on a 24 core `Intel(R) Xeon(R) CPU E5-2620 v2 @ 2.10GHz` with 40GB of memory reserved for TLC.
+It took one hour and four minutes to complete and TLC found 320,821,303 distinct states for a depth of 29 steps.
+
+I was also able to exhaustively check safety for 3 processes, 2 payloads, and 7 asynchronous epochs.
+This took 16 hours and TLC found 3,262,833,142 distinct states for a depth of 23 steps.
 
 
 

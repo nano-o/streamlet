@@ -65,12 +65,12 @@ A valid blockchain (or simply a chain for short) is a valid block tree in which 
 
 Each epoch `e` has a unique, pre-determined leader (e.g. process `(e mod N)+1`), and processes in epoch e must follow the following rules:
 - The leader proposes a new block with epoch number `e` that extends one of the longest notarized chains that the leader knows of (where notarized is defined below).
-- Every process votes for the leader's proposal as long as the proposal is longer than the longest notarized chains that the process knows of.
+- Every process votes for the leader's proposal as long as the proposal is longer than the longest notarized chains that the process ever voted to extend.
 - A block is notarized when it has gathered votes from a quorum in the same epoch, and a chain is notarized when all its blocks, except the genesis block, are notarized.
 - When a notarized chain includes three adjacent blocks with consecutive epoch numbers, the prefix of the chain up to the second of those 3 blocks is considered final.
 
 Process proceed from one epoch to the next through unspecified means.
-In practice, a process may increment its epoch using a real-time clock (e.g. each epoch lasting 5 seconds), or processes may use a synchronizer sub-protocol.
+In practice, a process may increment its epoch using a real-time clock (e.g. each epoch lasting 2 seconds), or processes may use a synchronizer sub-protocol.
 The synchronizer approach is more robust than simply relying on clocks, and it is used by many deployed protocols.
 Surprisingly, it dates back to the [pioneering work of Dwork, Lynch, and Stockmeyer](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf) in the 1980s.
 For a recent treatment, see [Gotsman et al.](https://arxiv.org/abs/2008.04167).
@@ -201,7 +201,7 @@ CONSTANTS
 22      process (proc \in P)
 23          variables
 24              epoch = 1, \* the current epoch of p
-25              height = 0; \* height of the longest notarized chain seen by p
+25              height = 0; \* height of the longest notarized chain that p voted to extend
 26      {
 27  l1:     while (epoch \in E) {
 28              \* if leader, make a proposal:
@@ -397,6 +397,11 @@ Compared to the present specification, this earlier specification uses a shared-
 This means that processes always have the same view of the system, which precludes some interesting behaviors of the Streamlet algorithm.
 In contrast, the specifications that I present reflect the fact that processes have different, partial views of what blocks have been notarized or not.
 
+Shir Cohen and Dahlia Malkhi compare Streamlet and HotStuff in the following [blog post](https://dahliamalkhi.github.io/posts/2020/12/what-they-didnt-teach-you-in-streamlet/).
+They not that Streamlet lacks some of the qualities of an engineering-ready protocol like HotStuff.
+While their blog post is very interesting, I do not agree with the claim that Streamlet requires synchronized epochs.
+The original Streamlet presentation indeed stipulates that processes proceeds through epochs in lock-steps (using synchronized real-time clocks). However, any synchronizer that guarantees that epochs become synchronous after GST
+ (in the sense that we have used in the current post) 
 # Other notes
 
 The rule that the leader uses to pick a block to extend can be slightly improved.

@@ -16,16 +16,6 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>Common.tla</name>
-			<type>1</type>
-			<location>/home/nano/Documents/streamlet/Common.tla</location>
-		</link>
-		<link>
-			<name>DiGraph.tla</name>
-			<type>1</type>
-			<location>/home/nano/Documents/streamlet/DiGraph.tla</location>
-		</link>
-		<link>
 			<name>Streamlet.tla</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Streamlet.tla</locationURI>

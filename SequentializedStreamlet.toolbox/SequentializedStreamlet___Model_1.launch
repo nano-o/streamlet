@@ -12,51 +12,55 @@
     <stringAttribute key="distributedTLC" value="off"/>
     <stringAttribute key="distributedTLCVMArgs" value=""/>
     <intAttribute key="fpBits" value="1"/>
-    <intAttribute key="fpIndex" value="119"/>
+    <intAttribute key="fpIndex" value="96"/>
     <booleanAttribute key="fpIndexRandom" value="true"/>
-    <intAttribute key="maxHeapSize" value="25"/>
+    <intAttribute key="maxHeapSize" value="85"/>
     <intAttribute key="maxSetSize" value="1000000"/>
     <booleanAttribute key="mcMode" value="true"/>
     <stringAttribute key="modelBehaviorInit" value=""/>
     <stringAttribute key="modelBehaviorNext" value=""/>
-    <stringAttribute key="modelBehaviorSpec" value="Init /\ [][Next]_vars"/>
+    <stringAttribute key="modelBehaviorSpec" value="Spec"/>
     <intAttribute key="modelBehaviorSpecType" value="1"/>
-    <stringAttribute key="modelBehaviorVars" value="epoch, vote, height, proposal"/>
+    <stringAttribute key="modelBehaviorVars" value="epoch, scheduled, height, proposal, votes"/>
     <stringAttribute key="modelComments" value=""/>
     <booleanAttribute key="modelCorrectnessCheckDeadlock" value="true"/>
     <listAttribute key="modelCorrectnessInvariants">
         <listEntry value="1Safety"/>
-        <listEntry value="0Canary1"/>
-        <listEntry value="0Canary2"/>
-        <listEntry value="0Canary3"/>
+        <listEntry value="0Inv1"/>
+        <listEntry value="0Inv2"/>
+        <listEntry value="0Inv3"/>
+        <listEntry value="0Inv4"/>
+        <listEntry value="0Liveness"/>
+        <listEntry value="0Canary5"/>
+        <listEntry value="0Canary6"/>
     </listAttribute>
     <listAttribute key="modelCorrectnessProperties"/>
     <intAttribute key="modelEditorOpenTabs" value="14"/>
     <stringAttribute key="modelExpressionEval" value=""/>
-    <stringAttribute key="modelParameterActionConstraint" value="\A p \in P : epoch'[p] &lt;= 6"/>
+    <stringAttribute key="modelParameterActionConstraint" value="epoch &lt; 9"/>
     <listAttribute key="modelParameterConstants">
-        <listEntry value="P;;{p1, p2, p3};1;1"/>
-        <listEntry value="Quorum;;{{p1,p2},{p2,p3},{p3,p1}};0;0"/>
+        <listEntry value="GSE;;5;0;0"/>
+        <listEntry value="Tx;;{Tx1, Tx2};1;1"/>
+        <listEntry value="P;;{p1, p2, p3};1;0"/>
+        <listEntry value="Quorum;;{{p1,p2},{p2,p3}};0;0"/>
         <listEntry value="Leader;e:;CASE e % 3 = 0 -&gt; p1&#10;[]&#9;e % 3 = 1 -&gt; p2&#10;[]&#9;e % 3 = 2 -&gt; p3;0;0"/>
-        <listEntry value="TxSet;;{TxSet1, TxSet2};1;1"/>
     </listAttribute>
     <stringAttribute key="modelParameterContraint" value=""/>
-    <listAttribute key="modelParameterDefinitions">
-        <listEntry value="Nat;;0..6;0;0"/>
-    </listAttribute>
+    <listAttribute key="modelParameterDefinitions"/>
     <stringAttribute key="modelParameterModelValues" value="{}"/>
     <stringAttribute key="modelParameterNewDefinitions" value=""/>
     <intAttribute key="modelVersion" value="20191005"/>
-    <intAttribute key="numberOfWorkers" value="4"/>
+    <intAttribute key="numberOfWorkers" value="18"/>
     <booleanAttribute key="recover" value="false"/>
     <stringAttribute key="result.mail.address" value=""/>
     <intAttribute key="simuAril" value="-1"/>
     <intAttribute key="simuDepth" value="100"/>
     <intAttribute key="simuSeed" value="-1"/>
-    <stringAttribute key="specName" value="Streamlet"/>
+    <stringAttribute key="specName" value="SequentializedStreamlet"/>
     <stringAttribute key="tlcResourcesProfile" value="local custom"/>
     <listAttribute key="traceExploreExpressions">
-        <listEntry value="1Notarized"/>
+        <listEntry value="0Notarized"/>
+        <listEntry value="1{b \in Blocks : Final(b)}"/>
     </listAttribute>
     <stringAttribute key="view" value=""/>
     <booleanAttribute key="visualizeStateGraph" value="false"/>

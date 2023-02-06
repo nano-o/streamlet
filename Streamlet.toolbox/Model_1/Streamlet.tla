@@ -1,7 +1,7 @@
 ----------------------------- MODULE Streamlet -----------------------------
 
 (***************************************************************************)
-(* This is a specification of a carsh-stop version of the Streamlet        *)
+(* This is a specification of a crash-stop version of the Streamlet        *)
 (* consensus algorithm.  See the following blog post for more details:     *)
 (* https://www.losa.fr/blog/streamlet-in-tla+                              *)
 (***************************************************************************)
@@ -11,7 +11,7 @@ EXTENDS Sequences, FiniteSets, Naturals
 
 CONSTANTS
         P \* The set of processes
-    ,   Tx \* Transtaction sets (the payload in a block)
+    ,   TxSet \* Transtaction sets (the payload in a block)
     ,   Quorum \* The set of quorums
     ,   Leader(_) \* maps a round to a leader
 
@@ -22,17 +22,18 @@ CONSTANTS
         proposal = [e \in Nat |-> <<>>]; \* the proposal for each epoch
     define {
         (*******************************************************************)
-        (* Instead including a pointer to the previous block in each       *)
-        (* block, we model blocks as sequences of pairs, where each pair   *)
-        (* consists of a transaction set an epoch.  The epoch of a block   *)
-        (* is the epoch element of the last pair in the sequence:          *)
+        (* The genesis block is the empty sequence:                        *)
         (*******************************************************************)
-        Epoch(b) == 
-            IF b = <<>>
-            THEN 0 \* note how the root is by convention a block with epoch 0
-            ELSE b[Len(b)][1]
-        \* The genesis block is the empty sequence:
         Genesis == <<>>
+        (*******************************************************************)
+        (* We model blocks as sequences of pairs, where each pair consists *)
+        (* of a transaction set and an epoch.  The epoch of a block is the *)
+        (* epoch element of the last pair in the sequence.                 *)
+        (*******************************************************************)
+        Epoch(b) ==
+            IF b = <<>>
+            THEN 0 \* the genesis block has epoch 0 by convention
+            ELSE b[Len(b)][1]
         (*******************************************************************)
         (* The parent of a block b of length l is just the prefix of b of  *)
         (* length l-1:                                                     *)
@@ -55,56 +56,66 @@ CONSTANTS
             { b \in Blocks : \E Q \in Quorum : \A p \in Q : b \in vote[p] }
         (*******************************************************************)
         (* A block b with epoch e is final when it has a sucessor          *)
-        (* notarized at epoch b+1 and a partent with epoch e-1:            *)
+        (* notarized at epoch b+1 and a parent with epoch e-1:             *)
         (*******************************************************************)
         Final(b) ==
-            /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
+            /\  \E txs \in TxSet : Append(b, <<Epoch(b)+1,txs>>) \in Notarized
             /\  Epoch(Parent(b)) = Epoch(b)-1
         FinalBlocks == {b \in Blocks : Final(b)}
         (*******************************************************************)
-        (* The safety property: final blocks form a chain.  We express     *)
-        (* this by stating that for every two final blocks b1 and b2, if   *)
-        (* b1 is shorter than b2 than b1 must be a prefix of b2:           *)
+        (* The safety property: every two final blocks are compatible,     *)
+        (* i.e.  final blocks form a chain.                                *)
         (*******************************************************************)
         Safety == \A b1,b2 \in FinalBlocks : Compatible(b1,b2)
     }
     process (proc \in P)
         variables
-            height = 0, \* height of the longest notarized chain that p voted to extend
-            epoch = 1; \* the current epoch of p
+            height = 0, \* height of the longest notarized chain that the process voted to extend
+            epoch = 1; \* the current epoch of the process
     {
 l1:     while (TRUE) {
-            \* if leader, make a proposal:
+            (***************************************************************)
+            (* If leader, propose a block extending one of the longest     *)
+            (* notarized chains that the process has seen:                 *)
+            (***************************************************************) 
             if (Leader(epoch) = self) {
-                \* we non-deterministically pick a notarized block to extend
-                \* this abstracts over what the leader really knows of:
-                with (parent \in {b \in Notarized : height <= Len(b) /\ Epoch(b) <= epoch})
-                with (tx \in Tx)
-                with(b = Append(parent, <<epoch, tx>>))
+                \* we non-deterministically pick a notarized block (longer than height) to extend
+                \* this abstracts over what the leader has seen:
+                with (parent \in {b \in Notarized : height <= Len(b)})
+                with (txs \in TxSet)
+                with(b = Append(parent, <<epoch, txs>>))
                     proposal[epoch] := b
             };
-            \* next, either vote for the leader's proposal or skip:
+            (***************************************************************)
+            (* Next, either vote for the leader's proposal or do nothing   *)
+            (* (e.g.  because the leader's proposal was not received):     *)
+            (***************************************************************)
             either {
                 when Len(proposal[epoch]) > height;
                 vote[self] := @ \cup {proposal[epoch]};
                 height := Len(proposal[epoch])-1
-            } or skip; \* skip voting
+            } 
+            or skip;
             \* finally, go to the next epoch
             epoch := epoch + 1;
         }
     }
 }
 *)
-\* BEGIN TRANSLATION (chksum(pcal) = "aee1d91" /\ chksum(tla) = "f9611369")
+\* BEGIN TRANSLATION (chksum(pcal) = "cd49cb42" /\ chksum(tla) = "64fd1d5c")
 VARIABLES vote, proposal
 
 (* define statement *)
+Genesis == <<>>
+
+
+
+
+
 Epoch(b) ==
     IF b = <<>>
     THEN 0
     ELSE b[Len(b)][1]
-
-Genesis == <<>>
 
 
 
@@ -130,10 +141,9 @@ Notarized == {Genesis} \cup
 
 
 Final(b) ==
-    /\  \E tx \in Tx : Append(b, <<Epoch(b)+1,tx>>) \in Notarized
+    /\  \E txs \in TxSet : Append(b, <<Epoch(b)+1,txs>>) \in Notarized
     /\  Epoch(Parent(b)) = Epoch(b)-1
 FinalBlocks == {b \in Blocks : Final(b)}
-
 
 
 
@@ -154,9 +164,9 @@ Init == (* Global variables *)
         /\ epoch = [self \in P |-> 1]
 
 proc(self) == /\ IF Leader(epoch[self]) = self
-                    THEN /\ \E parent \in {b \in Notarized : height[self] <= Len(b) /\ Epoch(b) <= epoch[self]}:
-                              \E tx \in Tx:
-                                LET b == Append(parent, <<epoch[self], tx>>) IN
+                    THEN /\ \E parent \in {b \in Notarized : height[self] <= Len(b)}:
+                              \E txs \in TxSet:
+                                LET b == Append(parent, <<epoch[self], txs>>) IN
                                   proposal' = [proposal EXCEPT ![epoch[self]] = b]
                     ELSE /\ TRUE
                          /\ UNCHANGED proposal
@@ -186,5 +196,5 @@ Canary2 == \neg (\E b1,b2 \in Notarized : Final(b2) /\ \neg Compatible(b1, b2))
 Canary3 == \neg (\E b \in Notarized : Final(b) /\ Epoch(b) # Epoch(SubSeq(b,1,1))+Len(b)-1)
 =============================================================================
 \* Modification History
-\* Last modified Sat Feb 04 11:09:27 PST 2023 by nano
+\* Last modified Sun Feb 05 07:43:34 PST 2023 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano

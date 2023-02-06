@@ -8,7 +8,7 @@
 (* For 3 processors, we are able to model-check that Streamlet decides in  *)
 (* 4 synchronous epochs at most even if we first have 5 completely         *)
 (* asynchronous epochs (which offers plenty of opportunity for notarized   *)
-(* forks, e.g.  two forks of length 3).  That took about 3 hours on an     *)
+(* forks, e.g.  a fork of length 3).  That takes about 3 hours on an       *)
 (* Intel i7-12700K with 64 GB of RAM.                                      *)
 (*                                                                         *)
 (* See the following blog post for more details:                           *)
@@ -216,5 +216,5 @@ Canary6 == \neg (
 
 =============================================================================
 \* Modification History
-\* Last modified Sat Feb 04 18:01:46 PST 2023 by nano
+\* Last modified Sun Feb 05 21:21:51 PST 2023 by nano
 \* Created Fri Dec 24 15:33:41 PST 2021 by nano

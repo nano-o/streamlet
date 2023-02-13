@@ -2,7 +2,10 @@
 
 (***************************************************************************)
 (* This is a specification of a crash-stop version of the Streamlet        *)
-(* consensus algorithm.  See the following blog post for more details:     *)
+(* consensus algorithm.  We check with TLC that the algorithm does not     *)
+(* produce forks for up to 8 epochs.                                       *)
+(*                                                                         *)
+(* See the following blog post for more details:                           *)
 (* https://www.losa.fr/blog/streamlet-in-tla+                              *)
 (***************************************************************************)
 
@@ -41,7 +44,7 @@ CONSTANTS
         Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1)
         Prefix(b1, b2) ==
             /\  Len(b1) <= Len(b2)
-            /\  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
+            /\  Len(b2) > 0 => b1 = SubSeq(b2, 1, Len(b1))
         (*******************************************************************)
         (* Two blocks b1 and b2 are compatible when one is a prefix of the *)
         (* other:                                                          *)

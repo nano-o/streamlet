@@ -5,11 +5,14 @@
 (* consensus algorithm.  We have sequentialized the specification in order *)
 (* to make model-checking of the liveness property of Streamlet tractable. *)
 (*                                                                         *)
-(* For 3 processors, we are able to model-check that Streamlet decides in  *)
-(* 4 synchronous epochs at most even if we first have 5 completely         *)
-(* asynchronous epochs (which offers plenty of opportunity for notarized   *)
-(* forks, e.g.  a fork of length 3).  That takes about 3 hours on an       *)
-(* Intel i7-12700K with 64 GB of RAM.                                      *)
+(* The liveness property is that Streamlet decides in at most 4 epochs     *)
+(* after the system becomes synchronous.                                   *)
+(*                                                                         *)
+(* For 3 processors, we are able to exhaustively check with TLC that       *)
+(* Streamlet decides in 4 synchronous epochs at most even if we first have *)
+(* 5 completely asynchronous epochs (which offers plenty of opportunity    *)
+(* for notarized forks, e.g.  a fork of length 3).  That takes about 3     *)
+(* hours on an Intel i7-12700K with 64 GB of RAM.                          *)
 (*                                                                         *)
 (* See the following blog post for more details:                           *)
 (* https://www.losa.fr/blog/streamlet-in-tla+                              *)
@@ -58,11 +61,12 @@ CONSTANTS
         \* Safety property:
         Safety == \A b1,b2 \in {b \in Blocks : Final(b)} : Compatible(b1, b2)
         \* Liveness property; after epoch GSE, it takes at most 4 epochs to finalize a new block:
-        Liveness == (epoch >= GSE+4) => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE
+        Liveness == epoch >= GSE+4 => \E b \in Blocks : Final(b) /\ Epoch(b) >= GSE
     }
     (***********************************************************************)
     (* Now we specify a global scheduler that produces sequentialized      *)
-    (* executions of the algorithm.  There are way less sequentialized     *)
+    (* executions of the algorithm, in which processes take turns          *)
+    (* executing one action each.  There are way less sequentialized       *)
     (* executions than normal executions, so this makes the model-checking *)
     (* problem easier.  Moreover, we informally justify in the blog post   *)
     (* why the correctness of the sequentialized executions implies the    *)

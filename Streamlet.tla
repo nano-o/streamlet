@@ -18,8 +18,7 @@ CONSTANTS
     ,   Quorum \* The set of quorums
     ,   Leader(_) \* maps a round to a leader
 
-(*
---algorithm Streamlet {
+(*--algorithm Streamlet {
     variables
         vote = [p \in P |-> {}], \* the vote cast by the processes
         proposal = [e \in Nat |-> <<>>]; \* the proposal for each epoch
@@ -103,9 +102,8 @@ l1:     while (TRUE) {
             epoch := epoch + 1;
         }
     }
-}
-*)
-\* BEGIN TRANSLATION (chksum(pcal) = "cd49cb42" /\ chksum(tla) = "64fd1d5c")
+} *)
+\* BEGIN TRANSLATION (chksum(pcal) = "3ef858fb" /\ chksum(tla) = "187c918e")
 VARIABLES vote, proposal
 
 (* define statement *)
@@ -126,7 +124,7 @@ Epoch(b) ==
 Parent(b) == IF Len(b) = 1 THEN Genesis ELSE SubSeq(b, 1, Len(b)-1)
 Prefix(b1, b2) ==
     /\  Len(b1) <= Len(b2)
-    /\  Len(b2) > 0 /\ b1 = SubSeq(b2, 1, Len(b1))
+    /\  Len(b2) > 0 => b1 = SubSeq(b2, 1, Len(b1))
 
 
 
@@ -199,5 +197,5 @@ Canary2 == \neg (\E b1,b2 \in Notarized : Final(b2) /\ \neg Compatible(b1, b2))
 Canary3 == \neg (\E b \in Notarized : Final(b) /\ Epoch(b) # Epoch(SubSeq(b,1,1))+Len(b)-1)
 =============================================================================
 \* Modification History
-\* Last modified Sun Feb 05 08:45:35 PST 2023 by nano
+\* Last modified Mon Feb 13 11:58:36 PST 2023 by nano
 \* Created Sun Dec 19 18:32:27 PST 2021 by nano
